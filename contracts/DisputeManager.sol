@@ -37,6 +37,7 @@ contract DisputeManager is VoterSelector {
     event VoterSelected(uint256 indexed jobId, address[] voters);
     event Voted(uint256 indexed jobId, address indexed voter, bool voteForWorker);
     event DisputeResolved(uint256 indexed jobId, bool workerWon);
+    event VotersReplaced(uint256 indexed jobId, address[] newVoters, uint256 newDeadline);
 
     // ── Bước 8: Raise dispute ───────────────────────────────────
     // Gọi từ GigStamp khi client hoặc worker muốn tranh chấp
@@ -155,6 +156,62 @@ contract DisputeManager is VoterSelector {
                 _subScore(v, 3, "voted_wrongly");
             }
         }
+    }
+
+    // ── Bước 12: Thay thế voter không hoạt động ──────────────────
+    function _replaceInactiveVoters(
+        uint256 jobId,
+        address jobClient,
+        address jobWorker
+    ) internal {
+        DisputeData storage d = disputes[jobId];
+        require(d.deadline > 0, "No dispute");
+        require(!d.resolved, "Already resolved");
+        require(block.timestamp >= d.deadline, "Deadline not passed");
+
+        // Tìm danh sách voter chưa vote
+        uint8 inactiveCount = 0;
+        for (uint8 i = 0; i < d.voterCount; i++) {
+            if (!hasVoted[jobId][d.voters[i]]) {
+                inactiveCount++;
+            }
+        }
+        require(inactiveCount > 0, "All selected voters have voted");
+
+        // Tạo danh sách loại trừ: Client, Worker, và các voter ĐANG CÓ (để tránh chọn trùng chính họ)
+        address[] memory excluded = new address[](2 + d.voterCount);
+        excluded[0] = jobClient;
+        excluded[1] = jobWorker;
+        for (uint8 i = 0; i < d.voterCount; i++) {
+            excluded[2 + i] = d.voters[i];
+        }
+
+        uint256 seed = uint256(keccak256(abi.encodePacked(block.timestamp, jobId, inactiveCount)));
+        address[] memory newSelected = _selectVotersExtended(excluded, seed, inactiveCount);
+
+        // Thay thế các voter chưa vote bằng voter mới
+        uint8 substituted = 0;
+        for (uint8 i = 0; i < d.voterCount; i++) {
+            if (!hasVoted[jobId][d.voters[i]] && substituted < newSelected.length) {
+                d.voters[i] = newSelected[substituted];
+                substituted++;
+            }
+        }
+
+        // Reset deadline
+        d.deadline = block.timestamp + VOTE_DURATION;
+        
+        emit VotersReplaced(jobId, newSelected, d.deadline);
+        emit VoterSelected(jobId, _getVotersArray(d)); // Thông báo lại danh sách mới
+    }
+
+    // Helper to get memory array from storage fixed array
+    function _getVotersArray(DisputeData storage d) internal view returns (address[] memory) {
+        address[] memory v = new address[](d.voterCount);
+        for (uint8 i = 0; i < d.voterCount; i++) {
+            v[i] = d.voters[i];
+        }
+        return v;
     }
 
     // ── View helpers ───────────────────────────────────────────

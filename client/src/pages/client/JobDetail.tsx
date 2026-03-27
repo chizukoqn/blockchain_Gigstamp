@@ -20,7 +20,7 @@ import { ethers } from 'ethers';
 export default function ClientJobDetail() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute('/client/job/:jobId');
-  const { getJobById, updateJobStatus, submitFeedback, feedbacks, setDisputeEvidence, setCounterEvidence } = useApp();
+  const { getJobById, updateJobStatus, submitFeedback, feedbacks, setDisputeEvidence, setDisputeInitiator, setDisputeVoters, addNotification, currentUser } = useApp();
   const [showFeedback, setShowFeedback] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -30,10 +30,6 @@ export default function ClientJobDetail() {
   const [disputeEvidenceText, setDisputeEvidenceText] = useState('');
   const [disputeEvidenceImages, setDisputeEvidenceImages] = useState<string[]>([]);
   const [disputeUploading, setDisputeUploading] = useState(false);
-
-  const [counterEvidenceText, setCounterEvidenceText] = useState('');
-  const [counterEvidenceImages, setCounterEvidenceImages] = useState<string[]>([]);
-  const [counterUploading, setCounterUploading] = useState(false);
 
   const contractRef = useRef<any>(null);
 
@@ -304,145 +300,37 @@ export default function ClientJobDetail() {
       const evidenceHash = hashEvidencePayload(payload);
       const tx = await contract.raiseDispute(onchainJobId, evidenceHash);
       await tx.wait();
-      toast.success('Dispute raised');
+
+      // Fetch newly selected voters to notify them immediately
+      const voters: string[] = await contract.getDisputeVoters(onchainJobId);
+      const cleanVoters = voters.filter((v: string) => v !== '0x0000000000000000000000000000000000000000');
+      
       setDisputeEvidence(job.id, evidenceHash, disputeEvidenceText, disputeEvidenceImages);
+      setDisputeInitiator(job.id, currentUser?.address || '');
+      if (cleanVoters.length > 0) {
+        setDisputeVoters(job.id, cleanVoters);
+      }
+
+      // Notify the worker
+      if (job.workerAddress) {
+        addNotification({
+          type: 'dispute_raised',
+          jobId: job.id,
+          message: `Client đã mở khiếu nại (dispute) cho Job #${job.id.slice(0, 6).toUpperCase()}`,
+          targetAddress: job.workerAddress,
+        });
+      }
+
+      toast.success('Dispute raised');
       setDisputeEvidenceText('');
       setDisputeEvidenceImages([]);
       updateJobStatus(job.id, 'disputed' as any);
+      
+      // Redirect to the new dispute page
+      setLocation(`/dispute/${job.id}`);
     } catch (err: any) {
       console.error(err);
       toast.error(err?.shortMessage || err?.message || 'Failed to raise dispute');
-    } finally {
-      setTxLoading(null);
-    }
-  };
-
-  const handleSubmitCounterEvidence = async () => {
-    if (!counterEvidenceText.trim() && counterEvidenceImages.length === 0) {
-      toast.error('Please provide counter evidence text and/or images');
-      return;
-    }
-    setTxLoading('Processing transaction...');
-    try {
-      const contract = await getContractOnce();
-      if (!contract) {
-        toast.error('Contract unavailable');
-        return;
-      }
-      const onchainJobId = getOnchainJobId();
-      if (onchainJobId === null) return;
-      const payload = buildEvidencePayload(counterEvidenceText, counterEvidenceImages);
-      const counterHash = hashEvidencePayload(payload);
-      const tx = await contract.submitCounterEvidence(onchainJobId, counterHash);
-      await tx.wait();
-      toast.success('Counter evidence submitted');
-      setCounterEvidence(job.id, counterHash, counterEvidenceText, counterEvidenceImages);
-      setCounterEvidenceText('');
-      setCounterEvidenceImages([]);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err?.shortMessage || err?.message || 'Failed to submit counter evidence');
-    } finally {
-      setTxLoading(null);
-    }
-  };
-
-  const handleDisputeEvidenceImagesChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files ? Array.from(e.target.files) : [];
-    if (files.length === 0) return;
-
-    setDisputeUploading(true);
-    try {
-      const readFileAsDataUrl = (file: File) =>
-        new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(new Error('Failed to read file'));
-          reader.readAsDataURL(file);
-        });
-
-      const newImages = await Promise.all(files.map(readFileAsDataUrl));
-      setDisputeEvidenceImages((prev) => [...prev, ...newImages]);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to upload images');
-    } finally {
-      setDisputeUploading(false);
-      e.target.value = '';
-    }
-  };
-
-  const handleRemoveDisputeImage = (index: number) => {
-    setDisputeEvidenceImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleCounterEvidenceImagesChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files ? Array.from(e.target.files) : [];
-    if (files.length === 0) return;
-
-    setCounterUploading(true);
-    try {
-      const readFileAsDataUrl = (file: File) =>
-        new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(new Error('Failed to read file'));
-          reader.readAsDataURL(file);
-        });
-
-      const newImages = await Promise.all(files.map(readFileAsDataUrl));
-      setCounterEvidenceImages((prev) => [...prev, ...newImages]);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to upload images');
-    } finally {
-      setCounterUploading(false);
-      e.target.value = '';
-    }
-  };
-
-  const handleRemoveCounterImage = (index: number) => {
-    setCounterEvidenceImages((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleVote = async (voteForWorker: boolean) => {
-    setTxLoading('Processing transaction...');
-    try {
-      const contract = await getContractOnce();
-      if (!contract) {
-        toast.error('Contract unavailable');
-        return;
-      }
-      const onchainJobId = getOnchainJobId();
-      if (onchainJobId === null) return;
-      const tx = await contract.castVote(onchainJobId, voteForWorker);
-      await tx.wait();
-      toast.success('Vote submitted');
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err?.shortMessage || err?.message || 'Failed to vote');
-    } finally {
-      setTxLoading(null);
-    }
-  };
-
-  const handleResolveDispute = async () => {
-    setTxLoading('Processing transaction...');
-    try {
-      const contract = await getContractOnce();
-      if (!contract) {
-        toast.error('Contract unavailable');
-        return;
-      }
-      const onchainJobId = getOnchainJobId();
-      if (onchainJobId === null) return;
-      const tx = await contract.resolveDispute(onchainJobId);
-      await tx.wait();
-      toast.success('Dispute resolved');
-      updateJobStatus(job.id, 'resolved' as any);
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err?.shortMessage || err?.message || 'Failed to resolve dispute');
     } finally {
       setTxLoading(null);
     }
@@ -476,6 +364,35 @@ export default function ClientJobDetail() {
 
   const handleRemoveEvidenceImage = (index: number) => {
     setEvidenceImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDisputeEvidenceImagesChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length === 0) return;
+
+    setDisputeUploading(true);
+    try {
+      const readFileAsDataUrl = (file: File) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error('Failed to read file'));
+          reader.readAsDataURL(file);
+        });
+
+      const newImages = await Promise.all(files.map(readFileAsDataUrl));
+      setDisputeEvidenceImages((prev) => [...prev, ...newImages]);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to upload images');
+    } finally {
+      setDisputeUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleRemoveDisputeImage = (index: number) => {
+    setDisputeEvidenceImages((prev) => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -859,126 +776,39 @@ export default function ClientJobDetail() {
               </Button>
             </div>
           )}
-
-          {/* Dispute: Active block */}
-          {normalizedStatus === 'DISPUTED' && (
-            <div className="bg-red-50 rounded-2xl p-6 border border-red-200">
-              <div className="flex items-start justify-between gap-3 mb-4">
+          {/* Dispute: Active or Resolved banner */}
+          {(normalizedStatus === 'DISPUTED' || normalizedStatus === 'RESOLVED') && (
+            <div className={`rounded-2xl p-6 border ${
+              normalizedStatus === 'RESOLVED' 
+                ? 'bg-amber-50 border-amber-200' 
+                : 'bg-red-50 border-red-200'
+            }`}>
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-red-900">Dispute Active</h3>
-                  <p className="text-sm text-red-800 mt-1">Job is currently in dispute.</p>
+                  <h3 className={`text-lg font-semibold ${
+                    normalizedStatus === 'RESOLVED' ? 'text-amber-900' : 'text-red-900'
+                  }`}>
+                    {normalizedStatus === 'RESOLVED' ? 'Dispute Resolved' : 'Dispute Active'}
+                  </h3>
+                  <p className={`text-sm mt-1 ${
+                    normalizedStatus === 'RESOLVED' ? 'text-amber-800' : 'text-red-800'
+                  }`}>
+                    {normalizedStatus === 'RESOLVED' 
+                      ? 'This dispute has been settled.' 
+                      : 'This job is currently under formal dispute.'}
+                  </p>
                 </div>
-                {txLoading && (
-                  <span className="text-sm font-semibold text-red-900">{txLoading}</span>
-                )}
-              </div>
-
-              {/* Dispute Info */}
-              <div className="bg-white/60 rounded-xl border border-red-100 p-4 mb-4">
-                <p className="text-sm text-red-900">
-                  <span className="font-semibold">JobId:</span> {job.id}
-                </p>
-                <p className="text-sm text-red-900 mt-1 break-all">
-                  <span className="font-semibold">Client:</span> {job.clientAddress}
-                </p>
-                <p className="text-sm text-red-900 mt-1 break-all">
-                  <span className="font-semibold">Worker:</span> {job.workerAddress || '—'}
-                </p>
-              </div>
-
-              {/* Counter Evidence */}
-              <div className="mb-4">
-                <h4 className="text-sm font-semibold text-red-900 mb-2">Counter Evidence</h4>
-                <textarea
-                  value={counterEvidenceText}
-                  onChange={(e) => setCounterEvidenceText(e.target.value)}
-                  placeholder="Counter evidence text (optional)"
-                  rows={3}
-                  className="w-full px-3 py-2 rounded-lg border border-red-200 focus:outline-none focus:ring-2 focus:ring-red-400 resize-none mb-3"
-                />
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  disabled={counterUploading}
-                  onChange={handleCounterEvidenceImagesChange}
-                  className="w-full text-sm text-red-900 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border file:border-red-200 file:bg-white file:text-red-900 hover:file:bg-red-50 disabled:opacity-50 mb-3"
-                />
-
-                {counterEvidenceImages.length > 0 && (
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    {counterEvidenceImages.map((src, idx) => (
-                      <div key={idx} className="relative">
-                        <img
-                          src={src}
-                          alt={`counter-evidence-${idx}`}
-                          className="w-full h-24 object-cover rounded-lg border border-red-200"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCounterImage(idx)}
-                          className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white border border-red-200 shadow text-red-900 hover:bg-red-50"
-                          aria-label="Remove image"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <Button
-                  onClick={handleSubmitCounterEvidence}
-                  disabled={!!txLoading}
-                  className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg disabled:opacity-50"
+                <Button 
+                  onClick={() => setLocation(`/dispute/${job.id}`)}
+                  variant="outline"
+                  className={normalizedStatus === 'RESOLVED' 
+                    ? 'border-amber-300 text-amber-900 hover:bg-amber-100' 
+                    : 'border-red-300 text-red-900 hover:bg-red-100'
+                  }
                 >
-                  {txLoading ? txLoading : 'Submit Counter Evidence'}
+                  View Details
                 </Button>
               </div>
-
-              {/* Voting */}
-              <div className="mb-4">
-                <h4 className="text-sm font-semibold text-red-900 mb-2">Voting</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Button
-                    onClick={() => handleVote(true)}
-                    disabled={!!txLoading}
-                    className="h-11 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-50"
-                  >
-                    Vote for Worker
-                  </Button>
-                  <Button
-                    onClick={() => handleVote(false)}
-                    disabled={!!txLoading}
-                    className="h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg disabled:opacity-50"
-                  >
-                    Vote for Client
-                  </Button>
-                </div>
-              </div>
-
-              {/* Resolve */}
-              <Button
-                onClick={handleResolveDispute}
-                disabled={!!txLoading}
-                className="w-full h-11 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg disabled:opacity-50"
-              >
-                {txLoading ? txLoading : 'Resolve Dispute'}
-              </Button>
-            </div>
-          )}
-
-          {/* Dispute: Resolved */}
-          {normalizedStatus === 'RESOLVED' && (
-            <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200">
-              <h3 className="text-lg font-semibold text-amber-900">Dispute Resolved</h3>
-              <p className="text-sm text-amber-800 mt-2">
-                Dispute has been resolved.
-              </p>
-              <p className="text-sm text-amber-800 mt-2">
-                {/* Winner data not available in current UI state */}
-                Winner: (not available)
-              </p>
             </div>
           )}
         </div>

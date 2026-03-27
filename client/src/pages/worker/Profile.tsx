@@ -7,7 +7,6 @@
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
-import { BottomNav } from '@/components/BottomNav';
 import { User, LogOut, Copy, Check, Star } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { formatRating } from '@/lib/status';
@@ -235,8 +234,6 @@ export default function WorkerProfile() {
           Logout
         </Button>
       </div>
-
-      <BottomNav />
     </div>
   );
 }

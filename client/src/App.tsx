@@ -11,6 +11,9 @@ import { useApp } from "./contexts/AppContext";
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import DisputePage from "@/pages/DisputePage";
+import DisputeListPage from "@/pages/DisputeListPage";
+import NotificationPage from "@/pages/NotificationPage";
 
 // Client Pages
 import ClientDashboard from "@/pages/client/Dashboard";
@@ -25,6 +28,7 @@ import WorkerJobDetail from "@/pages/worker/JobDetail";
 import WorkerProfile from "@/pages/worker/Profile";
 
 import Demo from "./pages/Demo";
+import { BottomNav } from "./components/BottomNav";
 
 function ProtectedRoute({ component: Component, requiredRole }: { component: any; requiredRole?: 'client' | 'worker' }) {
   const { currentUser } = useApp();
@@ -48,6 +52,17 @@ function Router() {
       <Route path={"/login"} component={Login} />
       <Route path={"/register"} component={Register} />
       <Route path={"/demo"} component={Demo} />
+
+      {/* Common Protected Routes */}
+      <Route path={"/dispute/:jobId"}>
+        {() => <ProtectedRoute component={DisputePage} />}
+      </Route>
+      <Route path={"/disputes"}>
+        {() => <ProtectedRoute component={DisputeListPage} />}
+      </Route>
+      <Route path={"/notifications"}>
+        {() => <ProtectedRoute component={NotificationPage} />}
+      </Route>
 
       {/* Client Routes */}
       <Route path={"/client/dashboard"}>
@@ -92,6 +107,7 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <Router />
+            <BottomNav />
           </TooltipProvider>
         </AppProvider>
       </ThemeProvider>

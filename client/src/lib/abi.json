@@ -170,6 +170,31 @@
     "type": "event"
   },
   {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "jobId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address[]",
+        "name": "newVoters",
+        "type": "address[]"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "newDeadline",
+        "type": "uint256"
+      }
+    ],
+    "name": "VotersReplaced",
+    "type": "event"
+  },
+  {
     "inputs": [],
     "name": "APPROVE_TIMEOUT",
     "outputs": [
@@ -876,6 +901,19 @@
   {
     "inputs": [],
     "name": "registerWorker",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "jobId",
+        "type": "uint256"
+      }
+    ],
+    "name": "replaceInactiveVoters",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

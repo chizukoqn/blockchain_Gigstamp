@@ -48,6 +48,11 @@ contract VoterSelector is ReputationManager {
             ? uint8(poolSize)
             : maxCount;
 
+        // BẮT BUỘC: Đảm bảo số voter là số lẻ để tránh hòa
+        if (count > 0 && count % 2 == 0) {
+            count--;
+        }
+
         address[] memory selected = new address[](count);
 
         // Bước 3: Fisher-Yates shuffle đơn giản dựa trên seed
@@ -64,6 +69,50 @@ contract VoterSelector is ReputationManager {
             shuffled[i]  = shuffled[j];
             shuffled[j]  = tmp;
             selected[i]  = shuffled[i];
+        }
+
+        return selected;
+    }
+
+    // Chọn voter với danh sách loại trừ động (Client, Worker, và các voter đã có)
+    function _selectVotersExtended(
+        address[] memory excluded,
+        uint256 seed,
+        uint8 countToSelect
+    ) internal view returns (address[] memory) {
+        address[] memory pool = new address[](_allUsers.length);
+        uint256 poolSize = 0;
+
+        for (uint256 i = 0; i < _allUsers.length; i++) {
+            address u = _allUsers[i];
+            bool isExcluded = false;
+            for (uint256 j = 0; j < excluded.length; j++) {
+                if (u == excluded[j]) {
+                    isExcluded = true;
+                    break;
+                }
+            }
+
+            if (!isExcluded && isEligibleVoter(u)) {
+                pool[poolSize] = u;
+                poolSize++;
+            }
+        }
+
+        uint8 finalCount = poolSize < countToSelect ? uint8(poolSize) : countToSelect;
+        // Đảm bảo số lẻ (nếu cần - tùy thuộc logic gọi nhưng _selectVotersExtended thường dùng để Replace)
+        // Tuy nhiên Dispute chính yêu cầu số lẻ, nên nếu Replace để bù đắp, tổng số vẫn nên là lẻ.
+        
+        address[] memory selected = new address[](finalCount);
+        address[] memory shuffled = new address[](poolSize);
+        for (uint256 i = 0; i < poolSize; i++) shuffled[i] = pool[i];
+
+        for (uint256 i = 0; i < finalCount; i++) {
+            uint256 j = i + (uint256(keccak256(abi.encodePacked(seed, i))) % (poolSize - i));
+            address tmp = shuffled[i];
+            shuffled[i] = shuffled[j];
+            shuffled[j] = tmp;
+            selected[i] = shuffled[i];
         }
 
         return selected;

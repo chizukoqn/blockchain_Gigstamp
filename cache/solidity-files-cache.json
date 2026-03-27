@@ -2,7 +2,7 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\Auth.sol": {
-      "lastModificationDate": 1774527109305,
+      "lastModificationDate": 1774608296872,
       "contentHash": "53cb4a1f063f2a9a4b40572913a79bf7",
       "sourceName": "contracts/Auth.sol",
       "solcConfig": {
@@ -42,8 +42,8 @@
       ]
     },
     "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\ReputationManager.sol": {
-      "lastModificationDate": 1774527109306,
-      "contentHash": "0521bd91e6e2a04692d2eba87fac7223",
+      "lastModificationDate": 1774607729809,
+      "contentHash": "6cd884ea582b2493ed377d0c34f25c4b",
       "sourceName": "contracts/ReputationManager.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -79,8 +79,8 @@
       ]
     },
     "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\VoterSelector.sol": {
-      "lastModificationDate": 1774527109307,
-      "contentHash": "76824f9fe180855d7eef2b949d88bee8",
+      "lastModificationDate": 1774628990318,
+      "contentHash": "23bef9655c4ba3dd582aaeffd5be58df",
       "sourceName": "contracts/VoterSelector.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -118,8 +118,8 @@
       ]
     },
     "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\GigStamp.sol": {
-      "lastModificationDate": 1774589689656,
-      "contentHash": "b87d1c6d420457565d72b48508b9a2e1",
+      "lastModificationDate": 1774629151965,
+      "contentHash": "8d1084b40e71f72184b30f444f9827bd",
       "sourceName": "contracts/GigStamp.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -195,8 +195,8 @@
       "artifacts": []
     },
     "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\DisputeManager.sol": {
-      "lastModificationDate": 1774580759626,
-      "contentHash": "a8177497aa9745b435eaa055337ec8b7",
+      "lastModificationDate": 1774629139914,
+      "contentHash": "44ad45fd12f290511d5a0a9f50cbf73c",
       "sourceName": "contracts/DisputeManager.sol",
       "solcConfig": {
         "version": "0.8.20",

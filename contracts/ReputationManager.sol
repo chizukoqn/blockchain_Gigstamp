@@ -4,10 +4,10 @@ pragma solidity ^0.8.20;
 contract ReputationManager {
 
     // ── Constants ──────────────────────────────────────
-    uint8 public constant INIT_SCORE   = 80;
+    uint8 public constant INIT_SCORE   = 100;
     uint8 public constant MAX_SCORE    = 100;
     uint8 public constant MIN_SCORE    = 0;
-    uint8 public constant VOTER_THRESHOLD = 80; // cần ≥ 80 để được chọn làm voter
+    uint8 public constant VOTER_THRESHOLD = 100; // cần ≥ 80 để được chọn làm voter
 
     // ── Storage ────────────────────────────────────────
     mapping(address => uint8)  public  reputationScore;

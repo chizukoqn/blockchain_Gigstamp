@@ -7,7 +7,6 @@
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
-import { BottomNav } from '@/components/BottomNav';
 import { formatRating } from '@/lib/status';
 import { Briefcase, Star, TrendingUp } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
@@ -36,9 +35,21 @@ export default function WorkerDashboard() {
   const disputedJobs = useMemo(() => {
     return (allJobs || []).filter((j: any) => {
       const s = typeof j.status === 'string' ? j.status.toUpperCase() : String(j.status);
-      return s === 'DISPUTED' || s === 'disputed'.toUpperCase();
+      const isDisputed = s === 'DISPUTED';
+      if (!isDisputed) return false;
+
+      // EXCLUDE if user is the worker or client of this job
+      const userAddr = currentUser.address.toLowerCase();
+      if (j.clientAddress?.toLowerCase() === userAddr) return false;
+      if (j.workerAddress?.toLowerCase() === userAddr) return false;
+
+      // INCLUDE ONLY if user is in the voters list
+      const isVoter = (j.disputeVoters || []).some(
+        (v: string) => v.toLowerCase() === userAddr
+      );
+      return isVoter;
     });
-  }, [allJobs]);
+  }, [allJobs, currentUser.address]);
 
   const getContractOnce = async () => {
     if (contractRef.current) return contractRef.current;
@@ -254,8 +265,6 @@ export default function WorkerDashboard() {
           </div>
         )}
       </div>
-
-      <BottomNav />
     </div>
   );
 }

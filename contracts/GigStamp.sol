@@ -71,9 +71,9 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
         require(msg.sender != job.client, "Cannot take own job");
         require(job.worker == address(0), "Already taken");
         require(
-        block.timestamp <= job.startTime,
-        "Start window expired"
-    );
+            block.timestamp <= job.startTime + job.tolerance,
+            "Start window expired"
+        );
 
         job.worker = msg.sender;
         job.acceptedAt = block.timestamp;
@@ -276,6 +276,13 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
     function castVote(uint256 jobId, bool voteForWorker) external {
         require(jobs[jobId].status == JobStatus.DISPUTED, "Not disputed");
         _castVote(jobId, msg.sender, voteForWorker);
+    }
+
+    // 10b. REPLACE INACTIVE VOTERS — thay thế voter không hoạt động sau deadline
+    function replaceInactiveVoters(uint256 jobId) external {
+        Job storage job = jobs[jobId];
+        require(job.status == JobStatus.DISPUTED, "Not disputed");
+        _replaceInactiveVoters(jobId, job.client, job.worker);
     }
 
     // 11. RESOLVE — ai cũng có thể trigger sau khi hết thời gian vote

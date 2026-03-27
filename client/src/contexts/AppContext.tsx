@@ -1,11 +1,11 @@
 /**
  * GigStamp App Context
- * Manages global state: user, jobs, feedbacks, worker stats
+ * Manages global state: user, jobs, feedbacks, worker stats, notifications
  * Auth: MetaMask only (no email/password)
  */
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { User, Job, Feedback, WorkerStats, UserRole, JobStatus } from '@/types';
+import { User, Job, Feedback, WorkerStats, UserRole, JobStatus, Notification, NotificationType } from '@/types';
 import { nanoid } from 'nanoid';
 import { connectWallet as connectMetaMaskWallet, getContract } from '@/lib/blockchain';
 
@@ -14,12 +14,13 @@ interface AppContextType {
   jobs: Job[];
   feedbacks: Feedback[];
   workerStats: Record<string, WorkerStats>;
-  
+  notifications: Notification[];
+
   // Auth actions
   connectWallet: () => Promise<void>;
   register: (role: UserRole) => Promise<void>;
   logout: () => void;
-  
+
   // Job actions
   createJob: (
     pay: number,
@@ -35,7 +36,18 @@ interface AppContextType {
   submitWork: (jobId: string, submissionDescription: string, evidenceImages?: string[]) => void;
   setDisputeEvidence: (jobId: string, hash: string, text: string, images: string[]) => void;
   setCounterEvidence: (jobId: string, hash: string, text: string, images: string[]) => void;
-  
+
+  // Dispute metadata actions
+  setDisputeInitiator: (jobId: string, initiatorAddress: string) => void;
+  setDisputeVoters: (jobId: string, voters: string[]) => void;
+  setDisputeResolved: (jobId: string, workerWon: boolean) => void;
+
+  // Notification actions
+  addNotification: (n: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
+  markNotificationRead: (notifId: string) => void;
+  markAllNotificationsRead: () => void;
+  getUnreadCount: (address: string) => number;
+
   // Feedback actions
   submitFeedback: (
     jobId: string,
@@ -43,13 +55,14 @@ interface AppContextType {
     comment: string,
     evidenceImages?: string[]
   ) => void;
-  
+
   // Utility
   getJobById: (jobId: string) => Job | undefined;
   getWorkerStats: (workerId: string) => WorkerStats;
   getJobsByClient: (clientId: string) => Job[];
   getAvailableJobs: () => Job[];
   getWorkerJobs: (workerId: string) => Job[];
+  getDisputesForUser: (address: string) => Job[];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -59,6 +72,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [workerStats, setWorkerStats] = useState<Record<string, WorkerStats>>({});
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // Load state from localStorage on mount
   useEffect(() => {
@@ -67,9 +81,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         const state = JSON.parse(savedState);
         setCurrentUser(state.currentUser ?? null);
-        setJobs(state.jobs);
-        setFeedbacks(state.feedbacks);
-        setWorkerStats(state.workerStats);
+        setJobs(state.jobs ?? []);
+        setFeedbacks(state.feedbacks ?? []);
+        setWorkerStats(state.workerStats ?? {});
+        setNotifications(state.notifications ?? []);
       } catch (error) {
         console.error('Failed to load state:', error);
       }
@@ -78,13 +93,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Save state to localStorage whenever it changes
   const saveState = useCallback(() => {
-    const state = { currentUser, jobs, feedbacks, workerStats };
+    const state = { currentUser, jobs, feedbacks, workerStats, notifications };
     localStorage.setItem('gigstamp-state', JSON.stringify(state));
-  }, [currentUser, jobs, feedbacks, workerStats]);
+  }, [currentUser, jobs, feedbacks, workerStats, notifications]);
 
   useEffect(() => {
     saveState();
-  }, [currentUser, jobs, feedbacks, workerStats, saveState]);
+  }, [currentUser, jobs, feedbacks, workerStats, notifications, saveState]);
+
+  // ── Notification helpers ──────────────────────────────────────
+  const addNotification = useCallback((n: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
+    setNotifications((prev) => {
+      // Tránh duplicate: kiểm tra cùng type + jobId + targetAddress
+      const isDuplicate = prev.some(
+        (existing) =>
+          existing.type === n.type &&
+          existing.jobId === n.jobId &&
+          existing.targetAddress === n.targetAddress
+      );
+      if (isDuplicate) return prev;
+
+      const newNotif: Notification = {
+        ...n,
+        id: nanoid(10),
+        timestamp: new Date().toISOString(),
+        read: false,
+      };
+      return [newNotif, ...prev];
+    });
+  }, []);
+
+  const markNotificationRead = useCallback((notifId: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
+    );
+  }, []);
+
+  const markAllNotificationsRead = useCallback(() => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  }, []);
+
+  const getUnreadCount = useCallback(
+    (address: string) =>
+      notifications.filter((n) => n.targetAddress === address && !n.read).length,
+    [notifications]
+  );
 
   const connectWallet = useCallback(async () => {
     const address = await connectMetaMaskWallet();
@@ -197,14 +250,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [currentUser]);
 
   const updateJobStatus = useCallback((jobId: string, status: JobStatus) => {
-    setJobs((prev) =>
-      prev.map((job) =>
-        job.id === jobId
-          ? { ...job, status, updatedAt: new Date().toISOString() }
-          : job
-      )
-    );
-  }, []);
+    setJobs((prev) => {
+      const job = prev.find((j) => j.id === jobId);
+      if (!job) return prev;
+
+      // Automated notifications
+      if (status === 'IN_PROGRESS' || status === ('in_progress' as any)) {
+        addNotification({
+          type: 'job_started',
+          jobId,
+          message: `Worker đã bắt đầu làm Job #${jobId.slice(0, 6).toUpperCase()}`,
+          targetAddress: job.clientAddress,
+        });
+      } else if (status === 'cancelled' && job.workerAddress) {
+        addNotification({
+          type: 'job_cancelled',
+          jobId,
+          message: `Client đã hủy Job #${jobId.slice(0, 6).toUpperCase()} mà bạn đã nhận`,
+          targetAddress: job.workerAddress,
+        });
+      }
+
+      return prev.map((j) =>
+        j.id === jobId
+          ? { ...j, status, updatedAt: new Date().toISOString() }
+          : j
+      );
+    });
+  }, [addNotification]);
 
   const applyForJob = useCallback((jobId: string): boolean => {
     if (!currentUser || currentUser.role !== 'worker') {
@@ -214,19 +287,27 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const job = jobs.find((j) => j.id === jobId);
     if (!job) return false;
 
-    // Check if job is already accepted
     if (job.status !== 'funded') {
       return false;
     }
 
-    // Check if already assigned
     if (job.workerId) {
       return false;
     }
 
-    // Assign worker and update status
-    setJobs((prev) =>
-      prev.map((j) =>
+    setJobs((prev) => {
+      const job = prev.find((j) => j.id === jobId);
+      if (!job) return prev;
+
+      // Notify Client
+      addNotification({
+        type: 'job_accepted',
+        jobId,
+        message: `Worker đã chấp nhận Job #${jobId.slice(0, 6).toUpperCase()}`,
+        targetAddress: job.clientAddress,
+      });
+
+      return prev.map((j) =>
         j.id === jobId
           ? {
               ...j,
@@ -236,11 +317,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               updatedAt: new Date().toISOString(),
             }
           : j
-      )
-    );
+      );
+    });
 
     return true;
-  }, [currentUser, jobs]);
+  }, [currentUser, jobs, addNotification]);
 
   const submitWork = useCallback(
     (jobId: string, submissionDescription: string, evidenceImages?: string[]) => {
@@ -249,21 +330,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Submission description is required');
       }
 
-      setJobs((prev) =>
-        prev.map((job) =>
-          job.id === jobId
+      setJobs((prev) => {
+        const job = prev.find((j) => j.id === jobId);
+        if (!job) return prev;
+
+        // Notify Client
+        addNotification({
+          type: 'work_submitted',
+          jobId,
+          message: `Worker đã nộp sản phẩm cho Job #${jobId.slice(0, 6).toUpperCase()}`,
+          targetAddress: job.clientAddress,
+        });
+
+        return prev.map((j) =>
+          j.id === jobId
             ? {
-                ...job,
+                ...j,
                 submissionDescription: normalizedDescription,
                 submissionEvidenceImages: evidenceImages ?? [],
                 status: 'submitted',
                 updatedAt: new Date().toISOString(),
               }
-            : job
-        )
-      );
+            : j
+        );
+      });
     },
-    []
+    [addNotification]
   );
 
   const setDisputeEvidence = useCallback(
@@ -303,6 +395,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     },
     []
   );
+
+  // ── Dispute metadata helpers ─────────────────────────────────
+  const setDisputeInitiator = useCallback((jobId: string, initiatorAddress: string) => {
+    setJobs((prev) =>
+      prev.map((job) =>
+        job.id === jobId
+          ? { ...job, disputeInitiator: initiatorAddress, updatedAt: new Date().toISOString() }
+          : job
+      )
+    );
+  }, []);
+
+  const setDisputeVoters = useCallback((jobId: string, voters: string[]) => {
+    setJobs((prev) =>
+      prev.map((job) =>
+        job.id === jobId
+          ? { ...job, disputeVoters: voters, updatedAt: new Date().toISOString() }
+          : job
+      )
+    );
+
+    // Notify each voter
+    voters.forEach((vAddress) => {
+      addNotification({
+        type: 'selected_as_voter',
+        jobId,
+        message: `Bạn được chọn làm voter cho Job #${jobId.slice(0, 6).toUpperCase()}`,
+        targetAddress: vAddress,
+      });
+    });
+  }, [addNotification]);
+
+  const setDisputeResolved = useCallback((jobId: string, workerWon: boolean) => {
+    setJobs((prev) =>
+      prev.map((job) =>
+        job.id === jobId
+          ? {
+              ...job,
+              disputeResolved: true,
+              disputeWorkerWon: workerWon,
+              status: 'resolved' as JobStatus,
+              updatedAt: new Date().toISOString(),
+            }
+          : job
+      )
+    );
+  }, []);
 
   const submitFeedback = useCallback(
     (jobId: string, rating: number, comment: string, evidenceImages?: string[]) => {
@@ -345,10 +484,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       };
     });
 
-    // Update job status to completed
     updateJobStatus(jobId, 'completed');
+
+    // Notify Worker
+    addNotification({
+      type: 'job_approved',
+      jobId,
+      message: `Client đã duyệt và thanh toán cho Job #${jobId.slice(0, 6).toUpperCase()}`,
+      targetAddress: job.workerAddress!,
+    });
   },
-    [jobs, updateJobStatus]
+    [jobs, updateJobStatus, addNotification]
   );
 
   const getJobById = useCallback((jobId: string): Job | undefined => {
@@ -379,11 +525,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return jobs.filter((j) => j.workerId === workerId);
   }, [jobs]);
 
+  // Trả về các jobs ở trạng thái disputed/resolved mà user hiện tại có liên quan
+  // (là client, worker trong job ĐÓ, hoặc là voter)
+  const getDisputesForUser = useCallback((address: string): Job[] => {
+    return jobs.filter((j) => {
+      const isDisputed =
+        (j.status === 'disputed' || j.status === 'DISPUTED' ||
+         j.status === 'resolved' || j.status === 'RESOLVED');
+      if (!isDisputed) return false;
+
+      const isClient = j.clientAddress?.toLowerCase() === address.toLowerCase();
+      const isWorker = j.workerAddress?.toLowerCase() === address.toLowerCase();
+      const isVoter = j.disputeVoters?.some(
+        (v) => v.toLowerCase() === address.toLowerCase()
+      );
+      return isClient || isWorker || isVoter;
+    });
+  }, [jobs]);
+
   const value: AppContextType = {
     currentUser,
     jobs,
     feedbacks,
     workerStats,
+    notifications,
     // Auth
     connectWallet,
     register,
@@ -394,12 +559,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     submitWork,
     setDisputeEvidence,
     setCounterEvidence,
+    // Dispute metadata
+    setDisputeInitiator,
+    setDisputeVoters,
+    setDisputeResolved,
+    // Notifications
+    addNotification,
+    markNotificationRead,
+    markAllNotificationsRead,
+    getUnreadCount,
+    // Feedback
     submitFeedback,
+    // Getters
     getJobById,
     getWorkerStats,
     getJobsByClient,
     getAvailableJobs,
     getWorkerJobs,
+    getDisputesForUser,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

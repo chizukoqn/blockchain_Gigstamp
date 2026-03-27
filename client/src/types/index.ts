@@ -24,6 +24,28 @@ export type JobStatus =
   | 'COMPLETED'
   | 'CANCELLED';
 
+export type NotificationType =
+  | 'job_status_changed'
+  | 'job_accepted'
+  | 'job_started'
+  | 'job_cancelled'
+  | 'work_submitted'
+  | 'job_approved'
+  | 'dispute_raised'
+  | 'dispute_raised_against_you'
+  | 'selected_as_voter'
+  | 'dispute_resolved';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  jobId: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  targetAddress: string; // địa chỉ ví mà notification này thuộc về
+}
+
 export interface User {
   id: string;
   address: string;
@@ -53,6 +75,11 @@ export interface Job {
   counterEvidenceText?: string;
   counterEvidenceImages?: string[];
   counterEvidenceHash?: string;
+  // Dispute metadata
+  disputeInitiator?: string;    // address của người khởi tạo dispute
+  disputeVoters?: string[];     // danh sách address voter (fetch on-chain)
+  disputeResolved?: boolean;    // dispute đã resolve chưa
+  disputeWorkerWon?: boolean;   // kết quả: worker thắng?
   status: JobStatus;
   distance?: string;
   createdAt: string;

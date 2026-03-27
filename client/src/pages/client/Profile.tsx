@@ -7,7 +7,6 @@
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
-import { BottomNav } from '@/components/BottomNav';
 import { User, LogOut, Copy, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getContract } from '@/lib/blockchain';
@@ -213,8 +212,6 @@ export default function ClientProfile() {
           Logout
         </Button>
       </div>
-
-      <BottomNav />
     </div>
   );
 }

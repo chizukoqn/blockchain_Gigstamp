@@ -7,7 +7,6 @@
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
-import { BottomNav } from '@/components/BottomNav';
 import { StatusBadge } from '@/components/StatusBadge';
 import { formatCurrency, formatDateTime } from '@/lib/status';
 import { Plus, ArrowRight } from 'lucide-react';
@@ -17,6 +16,7 @@ export default function ClientDashboard() {
   const [, setLocation] = useLocation();
   const { currentUser, getJobsByClient } = useApp();
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<'createdAt' | 'startTime'>('createdAt');
 
   if (!currentUser) {
     return null;
@@ -24,9 +24,19 @@ export default function ClientDashboard() {
 
   const jobs = getJobsByClient(currentUser.id);
   const filteredJobs = useMemo(() => {
-    if (statusFilter === 'all') return jobs;
-    return jobs.filter((job) => String(job.status).toUpperCase() === statusFilter);
-  }, [jobs, statusFilter]);
+    let result = statusFilter === 'all' 
+      ? [...jobs] 
+      : jobs.filter((job) => String(job.status).toUpperCase() === statusFilter);
+
+    // Sort logic
+    result.sort((a, b) => {
+      const dateA = new Date(a[sortBy]).getTime();
+      const dateB = new Date(b[sortBy]).getTime();
+      return dateB - dateA; // Descending (Newest first)
+    });
+
+    return result;
+  }, [jobs, statusFilter, sortBy]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -53,24 +63,37 @@ export default function ClientDashboard() {
 
       {/* Content */}
       <div className="container py-6">
-        <div className="mb-4">
-          <label className="text-sm text-gray-600 mr-2">Filter by status badge</label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm"
-          >
-            <option value="all">All</option>
-            <option value="CREATED">Created</option>
-            <option value="FUNDED">Funded</option>
-            <option value="ACCEPTED">Accepted</option>
-            <option value="IN_PROGRESS">In Progress</option>
-            <option value="SUBMITTED">Submitted</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-            <option value="DISPUTED">Disputed</option>
-            <option value="RESOLVED">Resolved</option>
-          </select>
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+            >
+              <option value="all">All Statuses</option>
+              <option value="CREATED">Created</option>
+              <option value="FUNDED">Funded</option>
+              <option value="ACCEPTED">Accepted</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="SUBMITTED">Submitted</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELLED">Cancelled</option>
+              <option value="DISPUTED">Disputed</option>
+              <option value="RESOLVED">Resolved</option>
+            </select>
+          </div>
+          <div className="flex-1">
+            <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 block">Sort By</label>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="w-full h-11 px-3 rounded-xl border border-gray-200 bg-white text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+            >
+              <option value="createdAt">Newest First</option>
+              <option value="startTime">Execution Date</option>
+            </select>
+          </div>
         </div>
         {filteredJobs.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center border border-gray-200">
@@ -139,8 +162,6 @@ export default function ClientDashboard() {
           </div>
         )}
       </div>
-
-      <BottomNav />
     </div>
   );
 }
