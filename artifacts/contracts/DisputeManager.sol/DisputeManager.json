@@ -1,0 +1,414 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "DisputeManager",
+  "sourceName": "contracts/DisputeManager.sol",
+  "abi": [
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "jobId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "responder",
+          "type": "address"
+        }
+      ],
+      "name": "CounterEvidenceSubmitted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "jobId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "initiator",
+          "type": "address"
+        }
+      ],
+      "name": "DisputeRaised",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "jobId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "workerWon",
+          "type": "bool"
+        }
+      ],
+      "name": "DisputeResolved",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "oldScore",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "newScore",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "ScoreChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "ScoreInitialized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "jobId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "voter",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "voteForWorker",
+          "type": "bool"
+        }
+      ],
+      "name": "Voted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "jobId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address[]",
+          "name": "voters",
+          "type": "address[]"
+        }
+      ],
+      "name": "VoterSelected",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "INIT_SCORE",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MAX_SCORE",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MIN_SCORE",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "VOTER_THRESHOLD",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "VOTE_DURATION",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "disputes",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "jobId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "initiator",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "evidenceHash",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "counterHash",
+          "type": "string"
+        },
+        {
+          "internalType": "uint8",
+          "name": "voterCount",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "votesForWorker",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "votesForClient",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint256",
+          "name": "deadline",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "resolved",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "workerWon",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "jobId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getDisputeVoters",
+      "outputs": [
+        {
+          "internalType": "address[5]",
+          "name": "",
+          "type": "address[5]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "jobId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getVoteCount",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "forWorker",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "forClient",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "hasVoted",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "isEligibleVoter",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "reputationScore",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "voteChoice",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x6080806040523461001657610589908161001c8239f35b600080fdfe6080604081815260048036101561001557600080fd5b600092833560e01c9081631732d6521461031557508063247bc4a71461012f57806327ff6223146102f957806340b89270146102de5780634225e7f41461029e57806343859632146102585780634654ff051461023b57806350d061cb14610200578063564a565d146101345780639ec0164a1461012f578063b2c2f2e8146100f05763fb468855146100a757600080fd5b346100ec57816003193601126100ec578160209360ff926100c66103f2565b90358252600686528282206001600160a01b039091168252855220549151911615158152f35b8280fd5b5082903461012b57602036600319011261012b5760099181849235825260205220015460ff825191818160081c16835260101c166020820152f35b5080fd5b6103bb565b50346100ec5760203660031901126100ec578035835260205290819020805460018201546001600160a01b03169290919060ff9061017460028401610439565b92826101c361018560038401610439565b6101b5600985015497600b600a8701549601549680519b8c9b8c5260208c015261014080918c01528a0190610513565b9088820360608a0152610513565b948181166080880152818160081c1660a088015260101c1660c086015260e0850152818116151561010085015260081c1615156101208301520390f35b50503461012b57602036600319011261012b5760209160ff9082906001600160a01b0361022b6103dc565b1681528085522054169051908152f35b50503461012b578160031936011261012b576020905161012c8152f35b50346100ec57816003193601126100ec578160209360ff926102786103f2565b90358252600586528282206001600160a01b039091168252855220549151911615158152f35b50503461012b57602036600319011261012b5760209160509060ff9083906001600160a01b036102cc6103dc565b16815280865220541610159051908152f35b50503461012b578160031936011261012b5751908152602090f35b50503461012b578160031936011261012b576020905160648152f35b919050346103b757602091826003193601126103b3578061033a60a092969596610408565b36903780358352808252838320845194910183855b600582106103945750505061036384610408565b519291835b600582106103755760a085f35b83516001600160a01b0316815292820192600191909101908201610368565b82546001600160a01b031681526001928301929190910190840161034f565b8480fd5b8380fd5b346103d75760003660031901126103d757602060405160508152f35b600080fd5b600435906001600160a01b03821682036103d757565b602435906001600160a01b03821682036103d757565b60a081019081106001600160401b0382111761042357604052565b634e487b7160e01b600052604160045260246000fd5b9060405191600090805490600182811c91818416938415610509575b60209485851081146104f5578489529081156104d7575060011461049b575b50505050829003601f01601f191682016001600160401b0381118382101761042357604052565b909293506000528260002091836000935b8385106104c3575050505083010138808080610474565b8054888601830152930192849082016104ac565b60ff191688860152505050151560051b840101905038808080610474565b634e487b7160e01b87526022600452602487fd5b92607f1692610455565b919082519283825260005b84811061053f575050826000602080949584010152601f8019910116010190565b60208183018101518483018201520161051e56fea26469706673582212206d2690b7e2e9c89b953bfed238ce7ebdad7aaf6512208c29a7db041aa096e21664736f6c63430008140033",
+  "deployedBytecode": "0x6080604081815260048036101561001557600080fd5b600092833560e01c9081631732d6521461031557508063247bc4a71461012f57806327ff6223146102f957806340b89270146102de5780634225e7f41461029e57806343859632146102585780634654ff051461023b57806350d061cb14610200578063564a565d146101345780639ec0164a1461012f578063b2c2f2e8146100f05763fb468855146100a757600080fd5b346100ec57816003193601126100ec578160209360ff926100c66103f2565b90358252600686528282206001600160a01b039091168252855220549151911615158152f35b8280fd5b5082903461012b57602036600319011261012b5760099181849235825260205220015460ff825191818160081c16835260101c166020820152f35b5080fd5b6103bb565b50346100ec5760203660031901126100ec578035835260205290819020805460018201546001600160a01b03169290919060ff9061017460028401610439565b92826101c361018560038401610439565b6101b5600985015497600b600a8701549601549680519b8c9b8c5260208c015261014080918c01528a0190610513565b9088820360608a0152610513565b948181166080880152818160081c1660a088015260101c1660c086015260e0850152818116151561010085015260081c1615156101208301520390f35b50503461012b57602036600319011261012b5760209160ff9082906001600160a01b0361022b6103dc565b1681528085522054169051908152f35b50503461012b578160031936011261012b576020905161012c8152f35b50346100ec57816003193601126100ec578160209360ff926102786103f2565b90358252600586528282206001600160a01b039091168252855220549151911615158152f35b50503461012b57602036600319011261012b5760209160509060ff9083906001600160a01b036102cc6103dc565b16815280865220541610159051908152f35b50503461012b578160031936011261012b5751908152602090f35b50503461012b578160031936011261012b576020905160648152f35b919050346103b757602091826003193601126103b3578061033a60a092969596610408565b36903780358352808252838320845194910183855b600582106103945750505061036384610408565b519291835b600582106103755760a085f35b83516001600160a01b0316815292820192600191909101908201610368565b82546001600160a01b031681526001928301929190910190840161034f565b8480fd5b8380fd5b346103d75760003660031901126103d757602060405160508152f35b600080fd5b600435906001600160a01b03821682036103d757565b602435906001600160a01b03821682036103d757565b60a081019081106001600160401b0382111761042357604052565b634e487b7160e01b600052604160045260246000fd5b9060405191600090805490600182811c91818416938415610509575b60209485851081146104f5578489529081156104d7575060011461049b575b50505050829003601f01601f191682016001600160401b0381118382101761042357604052565b909293506000528260002091836000935b8385106104c3575050505083010138808080610474565b8054888601830152930192849082016104ac565b60ff191688860152505050151560051b840101905038808080610474565b634e487b7160e01b87526022600452602487fd5b92607f1692610455565b919082519283825260005b84811061053f575050826000602080949584010152601f8019910116010190565b60208183018101518483018201520161051e56fea26469706673582212206d2690b7e2e9c89b953bfed238ce7ebdad7aaf6512208c29a7db041aa096e21664736f6c63430008140033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

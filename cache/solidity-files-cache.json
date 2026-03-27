@@ -1,0 +1,275 @@
+{
+  "_format": "hh-sol-cache-2",
+  "files": {
+    "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\Auth.sol": {
+      "lastModificationDate": 1774527109305,
+      "contentHash": "53cb4a1f063f2a9a4b40572913a79bf7",
+      "sourceName": "contracts/Auth.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 10
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./ReputationManager.sol",
+        "./VoterSelector.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "Auth"
+      ]
+    },
+    "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\ReputationManager.sol": {
+      "lastModificationDate": 1774527109306,
+      "contentHash": "0521bd91e6e2a04692d2eba87fac7223",
+      "sourceName": "contracts/ReputationManager.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 10
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "ReputationManager"
+      ]
+    },
+    "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\VoterSelector.sol": {
+      "lastModificationDate": 1774527109307,
+      "contentHash": "76824f9fe180855d7eef2b949d88bee8",
+      "sourceName": "contracts/VoterSelector.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 10
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./ReputationManager.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "VoterSelector"
+      ]
+    },
+    "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\GigStamp.sol": {
+      "lastModificationDate": 1774527109302,
+      "contentHash": "43356976723a3fe2782539b7182a8d92",
+      "sourceName": "contracts/GigStamp.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 10
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./Auth.sol",
+        "./GigStructs.sol",
+        "./DisputeManager.sol",
+        "./BadgeManager.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "GigStamp"
+      ]
+    },
+    "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\GigStructs.sol": {
+      "lastModificationDate": 1774527109304,
+      "contentHash": "ef88e1b34630369e614e26787762e987",
+      "sourceName": "contracts/GigStructs.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 10
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": []
+    },
+    "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\DisputeManager.sol": {
+      "lastModificationDate": 1774527109309,
+      "contentHash": "a8177497aa9745b435eaa055337ec8b7",
+      "sourceName": "contracts/DisputeManager.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 10
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "./GigStructs.sol",
+        "./VoterSelector.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "DisputeManager"
+      ]
+    },
+    "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\BadgeManager.sol": {
+      "lastModificationDate": 1774527109311,
+      "contentHash": "f3ab8a06512ffd3b55bad569d836dc6a",
+      "sourceName": "contracts/BadgeManager.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 10
+          },
+          "viaIR": true,
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "BadgeManager"
+      ]
+    }
+  }
+}
