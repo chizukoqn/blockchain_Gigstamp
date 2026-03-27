@@ -13,12 +13,12 @@ import { Briefcase, Star, TrendingUp } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { getContract } from '@/lib/blockchain';
 import { toast } from 'sonner';
-import { jobIdToUint256 } from '@/lib/evidence';
 
 export default function WorkerDashboard() {
   const [, setLocation] = useLocation();
   const { currentUser, getWorkerStats, getWorkerJobs, jobs: allJobs } = useApp();
   const [txLoading, setTxLoading] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState('all');
   const contractRef = useRef<any>(null);
 
   if (!currentUser) {
@@ -27,6 +27,10 @@ export default function WorkerDashboard() {
 
   const stats = getWorkerStats(currentUser.id);
   const jobs = getWorkerJobs(currentUser.id);
+  const filteredJobs = useMemo(() => {
+    if (statusFilter === 'all') return jobs;
+    return jobs.filter((job) => String(job.status).toUpperCase() === statusFilter);
+  }, [jobs, statusFilter]);
   const completedJobs = jobs.filter((j) => j.status === 'completed').length;
 
   const disputedJobs = useMemo(() => {
@@ -52,7 +56,12 @@ export default function WorkerDashboard() {
         toast.error('Contract unavailable');
         return;
       }
-      const tx = await contract.castVote(jobIdToUint256(jobId), voteForWorker);
+      const job = (allJobs || []).find((j: any) => j.id === jobId);
+      if (!job?.onchainJobId) {
+        toast.error('Missing on-chain job ID');
+        return;
+      }
+      const tx = await contract.castVote(BigInt(job.onchainJobId), voteForWorker);
       await tx.wait();
       toast.success('Vote submitted (rewards will be claimable if applicable)');
     } catch (err: any) {
@@ -203,8 +212,25 @@ export default function WorkerDashboard() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
               Your Recent Jobs
             </h2>
+            <div className="mb-4">
+              <label className="text-sm text-gray-600 mr-2">Filter by status badge</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm"
+              >
+                <option value="all">All</option>
+                <option value="ACCEPTED">Accepted</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="SUBMITTED">Submitted</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+                <option value="DISPUTED">Disputed</option>
+                <option value="RESOLVED">Resolved</option>
+              </select>
+            </div>
             <div className="space-y-3">
-              {jobs.slice(0, 3).map((job) => (
+              {filteredJobs.slice(0, 3).map((job) => (
                 <div
                   key={job.id}
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"

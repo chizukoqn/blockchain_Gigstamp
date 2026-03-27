@@ -11,16 +11,22 @@ import { BottomNav } from '@/components/BottomNav';
 import { StatusBadge } from '@/components/StatusBadge';
 import { formatCurrency, formatDateTime } from '@/lib/status';
 import { Plus, ArrowRight } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 export default function ClientDashboard() {
   const [, setLocation] = useLocation();
   const { currentUser, getJobsByClient } = useApp();
+  const [statusFilter, setStatusFilter] = useState('all');
 
   if (!currentUser) {
     return null;
   }
 
   const jobs = getJobsByClient(currentUser.id);
+  const filteredJobs = useMemo(() => {
+    if (statusFilter === 'all') return jobs;
+    return jobs.filter((job) => String(job.status).toUpperCase() === statusFilter);
+  }, [jobs, statusFilter]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -47,7 +53,26 @@ export default function ClientDashboard() {
 
       {/* Content */}
       <div className="container py-6">
-        {jobs.length === 0 ? (
+        <div className="mb-4">
+          <label className="text-sm text-gray-600 mr-2">Filter by status badge</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm"
+          >
+            <option value="all">All</option>
+            <option value="CREATED">Created</option>
+            <option value="FUNDED">Funded</option>
+            <option value="ACCEPTED">Accepted</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="SUBMITTED">Submitted</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="DISPUTED">Disputed</option>
+            <option value="RESOLVED">Resolved</option>
+          </select>
+        </div>
+        {filteredJobs.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center border border-gray-200">
             <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <Plus className="w-8 h-8 text-gray-400" />
@@ -67,7 +92,7 @@ export default function ClientDashboard() {
           </div>
         ) : (
           <div className="space-y-4">
-            {jobs.map((job) => (
+            {filteredJobs.map((job) => (
               <div
                 key={job.id}
                 className="bg-white rounded-2xl p-4 border border-gray-200 hover:shadow-md transition-shadow cursor-pointer"

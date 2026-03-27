@@ -184,32 +184,6 @@
   },
   {
     "inputs": [],
-    "name": "FUND_TIMEOUT",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "GHOST_SCAM_THRESHOLD",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "INIT_SCORE",
     "outputs": [
       {
@@ -263,19 +237,6 @@
   {
     "inputs": [],
     "name": "SERIAL_CANCEL_THRESHOLD",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "SUBMIT_TIMEOUT",
     "outputs": [
       {
         "internalType": "uint256",
@@ -456,7 +417,17 @@
       },
       {
         "internalType": "uint256",
-        "name": "_deadline",
+        "name": "_startTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_endTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_tolerance",
         "type": "uint256"
       }
     ],
@@ -811,7 +782,17 @@
       },
       {
         "internalType": "uint256",
-        "name": "deadline",
+        "name": "startTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "endTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "tolerance",
         "type": "uint256"
       },
       {

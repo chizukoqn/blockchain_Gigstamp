@@ -23,18 +23,22 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
     ) external {
 
         require(roles[msg.sender] == Role.CLIENT, "Not client");
-        require(_startTime < _endTime, "Invalid time range");
 
         jobs[jobCount] = Job({
             client: msg.sender,
             worker: address(0),
+
             pay: _pay,
+
             startTime: _startTime,
             endTime: _endTime,
             tolerance: _tolerance,
+            
             jobHash: _jobHash,
             resultHash: "",
+
             status: JobStatus.CREATED,
+
             fundedAt: 0,
             acceptedAt: 0,
             submittedAt: 0
@@ -66,6 +70,10 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
         require(job.status == JobStatus.FUNDED, "Not funded");
         require(msg.sender != job.client, "Cannot take own job");
         require(job.worker == address(0), "Already taken");
+        require(
+        block.timestamp <= job.startTime,
+        "Start window expired"
+    );
 
         job.worker = msg.sender;
         job.acceptedAt = block.timestamp;
@@ -78,7 +86,6 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
     Job storage job = jobs[jobId];
     require(msg.sender == job.worker,          "Not worker");
     require(job.status == JobStatus.ACCEPTED,  "Not accepted");
-    require(block.timestamp >= job.startTime,  "Too early to start");
     require(
         block.timestamp <= job.startTime + job.tolerance,
         "Start window expired"
@@ -87,7 +94,7 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
     job.status = JobStatus.IN_PROGRESS;
     }
 
-    // Timeout: worker accept nhưng không start trong START_WINDOW
+    // Timeout: worker accept nhưng không start trong thời gian cho phép
     function cancelIfNotStarted(uint256 jobId) external {
         Job storage job = jobs[jobId];
         require(job.status == JobStatus.ACCEPTED, "Not accepted");
@@ -96,10 +103,10 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
             "Too early"
         );
 
-        job.status = JobStatus.FUNDED; // quay về FUNDED để worker khác có thể nhận
+        job.status = JobStatus.CANCELLED; // Hủy
         address oldWorker  = job.worker;
-        job.worker         = address(0);
-        job.acceptedAt     = 0;
+        (bool ok, ) = job.client.call{value: job.pay}("");
+        require(ok, "Refund failed");
 
         // Phạt worker nhận rồi bỏ
         _subScore(oldWorker, 5, "worker_accepted_not_started");
@@ -112,6 +119,10 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
 
         require(msg.sender == job.worker, "Not worker");
         require(job.status == JobStatus.IN_PROGRESS, "Invalid state");
+        require(
+            block.timestamp <= job.endTime + job.tolerance,
+            "Submit window expired"
+        );
 
         job.resultHash = _resultHash;
         job.submittedAt  = block.timestamp;
@@ -172,18 +183,13 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
     }
 
     // 6. REFUND IF NOT ACCEPTED
-    uint256 public constant FUND_TIMEOUT = 60; // 60 giây để test
     
     function cancelJob(uint256 jobId) external {
         Job storage job = jobs[jobId];
         require(msg.sender == job.client, "Not client");
 
-        // ── Trường hợp 1: FUNDED, chưa ai nhận, quá FUND_TIMEOUT ──
+        // ── Trường hợp 1: FUNDED, chưa ai nhận
         if (job.status == JobStatus.FUNDED) {
-            require(
-                block.timestamp >= job.fundedAt + FUND_TIMEOUT,
-                "Too early"
-            );
             job.status = JobStatus.CANCELLED;
             _payout(job.client, job.pay);
             return;
@@ -194,8 +200,6 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
         if (job.status == JobStatus.ACCEPTED) {
             job.status = JobStatus.CANCELLED;
 
-            address cancelledWorker = job.worker;
-
             // Ghi nhận hành vi client hủy sau khi có worker → scam check
             _recordClientCancel(job.client, jobId);
 
@@ -204,7 +208,7 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
             _payout(job.client, job.pay);
 
             // Nhưng ghi nhận để worker biết client này hay cancel
-            _addBadge(cancelledWorker, BadgeType.SERIAL_CANCELLER, jobId);
+            _addBadge(job.client, BadgeType.SERIAL_CANCELLER, jobId);
             return;
         }
 
@@ -302,16 +306,15 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
         }
     }
 
-    uint256 public constant SUBMIT_TIMEOUT  = 120;
     uint256 public constant APPROVE_TIMEOUT = 120;
 
-    // ── TIMEOUT 2: Worker nhận job nhưng không submit ─────────
+    // ── TIMEOUT 2: Worker start nhưng không submit ─────────
     // Client hoặc bất kỳ ai trigger sau SUBMIT_TIMEOUT
     function cancelIfNotSubmitted(uint256 jobId) external {
         Job storage job = jobs[jobId];
         require(job.status == JobStatus.IN_PROGRESS, "Not in progress");
         require(
-            block.timestamp >= job.acceptedAt + SUBMIT_TIMEOUT,
+            block.timestamp >= job.endTime + job.tolerance,
             "Too early"
         );
 
@@ -327,7 +330,7 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
     }
 
     // ── TIMEOUT 3: Worker submit nhưng client không phản hồi ──
-    // Điểm mạnh của hệ thống: tự động trả tiền cho worker
+    // tự động trả tiền cho worker
     function autoReleaseIfNotApproved(uint256 jobId) external {
         Job storage job = jobs[jobId];
         require(job.status == JobStatus.SUBMITTED, "Not submitted");

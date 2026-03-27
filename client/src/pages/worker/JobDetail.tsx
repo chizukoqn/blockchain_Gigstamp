@@ -11,9 +11,9 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { formatCurrency, formatDateTime } from '@/lib/status';
 import { ArrowLeft, MapPin, Clock, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
-import { useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { getContract } from '@/lib/blockchain';
-import { buildEvidencePayload, hashEvidencePayload, jobIdToUint256 } from '@/lib/evidence';
+import { buildEvidencePayload, hashEvidencePayload } from '@/lib/evidence';
 
 export default function WorkerJobDetail() {
   const [, setLocation] = useLocation();
@@ -32,7 +32,15 @@ export default function WorkerJobDetail() {
   const [counterEvidenceText, setCounterEvidenceText] = useState('');
   const [counterEvidenceImages, setCounterEvidenceImages] = useState<string[]>([]);
   const [counterUploading, setCounterUploading] = useState(false);
+  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
   const contractRef = useRef<any>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowSec(Math.floor(Date.now() / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   if (!match || !currentUser) {
     return null;
@@ -43,10 +51,28 @@ export default function WorkerJobDetail() {
   const isApplied = workerJobs.some((j) => j.id === job?.id);
   const normalizedStatus = useMemo(() => {
     if (!job) return '';
-    if (job.status === 'accepted') return 'IN_PROGRESS';
+    if (job.status === 'accepted') return 'ACCEPTED';
     if (typeof job.status === 'string') return job.status.toUpperCase();
     return String(job.status);
   }, [job]);
+
+  const formatRemaining = (targetSec: number) => {
+    const diff = targetSec - nowSec;
+    if (diff <= 0) return 'Expired';
+    const hours = Math.floor(diff / 3600);
+    const minutes = Math.floor((diff % 3600) / 60);
+    const seconds = diff % 60;
+    return `${hours}h ${minutes}m ${seconds}s`;
+  };
+
+  const startDeadlineSec =
+    Number.isFinite(Date.parse(job?.startTime ?? '')) && job
+      ? Math.floor(new Date(job.startTime).getTime() / 1000) + job.tolerance
+      : null;
+  const submitDeadlineSec =
+    Number.isFinite(Date.parse(job?.endTime ?? '')) && job
+      ? Math.floor(new Date(job.endTime).getTime() / 1000) + job.tolerance
+      : null;
 
   if (!job) {
     return (
@@ -64,8 +90,23 @@ export default function WorkerJobDetail() {
     );
   }
 
-  const handleApply = () => {
+  const handleApply = async () => {
+    if (!job.onchainJobId) {
+      toast.error('Missing on-chain job ID');
+      return;
+    }
+
     try {
+      const contract = await getContractOnce();
+      if (!contract) {
+        toast.error('Contract unavailable');
+        return;
+      }
+
+      setTxLoading('Processing transaction...');
+      const tx = await contract.acceptJob(BigInt(job.onchainJobId));
+      await tx.wait();
+
       const success = applyForJob(job.id);
       if (success) {
         toast.success('Applied successfully!');
@@ -73,9 +114,11 @@ export default function WorkerJobDetail() {
       } else {
         toast.error('Could not apply for this job');
       }
-    } catch (error) {
-      toast.error('Failed to apply');
+    } catch (error: any) {
+      toast.error(error?.shortMessage || error?.message || 'Failed to apply');
       console.error(error);
+    } finally {
+      setTxLoading(null);
     }
   };
 
@@ -84,20 +127,128 @@ export default function WorkerJobDetail() {
       toast.error('Please describe your work');
       return;
     }
+    if (!job.onchainJobId) {
+      toast.error('Missing on-chain job ID');
+      return;
+    }
 
     setLoading(true);
     try {
+      const contract = await getContractOnce();
+      if (!contract) {
+        toast.error('Contract unavailable');
+        return;
+      }
+
+      const onchainJobId = BigInt(job.onchainJobId);
+      const resultPayload = buildEvidencePayload(resultDescription, evidenceImages);
+      const resultHash = hashEvidencePayload(resultPayload);
+      const onchainJob = await contract.jobs(onchainJobId);
+      const onchainStatus = Number(onchainJob.status ?? onchainJob[11]);
+      const endTime = Number(onchainJob.endTime ?? onchainJob[4]);
+      const tolerance = Number(onchainJob.tolerance ?? onchainJob[5]);
+      const nowSec = Math.floor(Date.now() / 1000);
+
+      if (onchainStatus !== 3) {
+        if (onchainStatus === 4) {
+          toast.error('This job is already submitted on-chain.');
+        } else {
+          toast.error('Please start the job first.');
+        }
+        return;
+      }
+
+      if (nowSec > endTime + tolerance) {
+        toast.error('You started too late to submit (submit window expired).');
+        return;
+      }
+
+      const submitTx = await contract.submitWork(onchainJobId, resultHash);
+      await submitTx.wait();
+
       submitWork(job.id, resultDescription, evidenceImages);
       toast.success('Work submitted! Waiting for approval.');
       setShowSubmit(false);
       setResultDescription('');
       setEvidenceImages([]);
       setTimeout(() => setLocation('/worker/dashboard'), 1500);
-    } catch (error) {
-      toast.error('Failed to submit work');
+    } catch (error: any) {
+      toast.error(error?.shortMessage || error?.message || 'Failed to submit work');
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStartJob = async () => {
+    if (!job.onchainJobId) {
+      toast.error('Missing on-chain job ID');
+      return;
+    }
+
+    setTxLoading('Processing transaction...');
+    try {
+      const contract = await getContractOnce();
+      if (!contract) {
+        toast.error('Contract unavailable');
+        return;
+      }
+
+      const onchainJobId = BigInt(job.onchainJobId);
+      const onchainJob = await contract.jobs(onchainJobId);
+      const onchainStatus = Number(onchainJob.status ?? onchainJob[11]);
+      const startTime = Number(onchainJob.startTime ?? onchainJob[3]);
+      const tolerance = Number(onchainJob.tolerance ?? onchainJob[5]);
+      const nowSec = Math.floor(Date.now() / 1000);
+
+      if (onchainStatus !== 2) {
+        if (onchainStatus === 3) {
+          updateJobStatus(job.id, 'IN_PROGRESS' as any);
+          toast.success('Job is already started. You can submit now.');
+          return;
+        }
+        toast.error(`Cannot start in current on-chain status (${onchainStatus}).`);
+        return;
+      }
+
+      if (nowSec > startTime + tolerance) {
+        toast.error('You started too late (start window expired).');
+        return;
+      }
+
+      const tx = await contract.startWork(onchainJobId);
+      await tx.wait();
+      updateJobStatus(job.id, 'IN_PROGRESS' as any);
+      toast.success('Job started. You can submit your work now.');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.shortMessage || err?.message || 'Failed to start job');
+    } finally {
+      setTxLoading(null);
+    }
+  };
+
+  const handleTriggerCancelIfNotStarted = async () => {
+    if (!job.onchainJobId) {
+      toast.error('Missing on-chain job ID');
+      return;
+    }
+    setTxLoading('Processing transaction...');
+    try {
+      const contract = await getContractOnce();
+      if (!contract) {
+        toast.error('Contract unavailable');
+        return;
+      }
+      const tx = await contract.cancelIfNotStarted(BigInt(job.onchainJobId));
+      await tx.wait();
+      updateJobStatus(job.id, 'cancelled');
+      toast.success('Timeout triggered. Job cancelled and refunded to client.');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.shortMessage || err?.message || 'Too early or action failed');
+    } finally {
+      setTxLoading(null);
     }
   };
 
@@ -152,7 +303,11 @@ export default function WorkerJobDetail() {
       }
       const payload = buildEvidencePayload(disputeEvidenceText, disputeEvidenceImages);
       const evidenceHash = hashEvidencePayload(payload);
-      const onchainJobId = jobIdToUint256(job!.id);
+      if (!job?.onchainJobId) {
+        toast.error('Missing on-chain job ID');
+        return;
+      }
+      const onchainJobId = BigInt(job.onchainJobId);
       const tx = await contract.raiseDispute(onchainJobId, evidenceHash);
       await tx.wait();
       toast.success('Dispute raised');
@@ -182,7 +337,11 @@ export default function WorkerJobDetail() {
       }
       const payload = buildEvidencePayload(counterEvidenceText, counterEvidenceImages);
       const counterHash = hashEvidencePayload(payload);
-      const onchainJobId = jobIdToUint256(job!.id);
+      if (!job?.onchainJobId) {
+        toast.error('Missing on-chain job ID');
+        return;
+      }
+      const onchainJobId = BigInt(job.onchainJobId);
       const tx = await contract.submitCounterEvidence(onchainJobId, counterHash);
       await tx.wait();
       toast.success('Counter evidence submitted');
@@ -263,7 +422,11 @@ export default function WorkerJobDetail() {
         toast.error('Contract unavailable');
         return;
       }
-      const onchainJobId = jobIdToUint256(job!.id);
+      if (!job?.onchainJobId) {
+        toast.error('Missing on-chain job ID');
+        return;
+      }
+      const onchainJobId = BigInt(job.onchainJobId);
       const tx = await contract.castVote(onchainJobId, voteForWorker);
       await tx.wait();
       toast.success('Vote submitted');
@@ -283,7 +446,11 @@ export default function WorkerJobDetail() {
         toast.error('Contract unavailable');
         return;
       }
-      const onchainJobId = jobIdToUint256(job!.id);
+      if (!job?.onchainJobId) {
+        toast.error('Missing on-chain job ID');
+        return;
+      }
+      const onchainJobId = BigInt(job.onchainJobId);
       const tx = await contract.resolveDispute(onchainJobId);
       await tx.wait();
       toast.success('Dispute resolved');
@@ -390,6 +557,43 @@ export default function WorkerJobDetail() {
 
         {/* Actions */}
         <div className="space-y-3">
+          {normalizedStatus === 'ACCEPTED' && startDeadlineSec !== null && (
+            <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
+              <p className="text-sm text-amber-900">
+                Time left to start: <span className="font-semibold">{formatRemaining(startDeadlineSec)}</span>
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                Deadline: {formatDateTime(new Date(startDeadlineSec * 1000).toISOString())}
+              </p>
+              {nowSec > startDeadlineSec && (
+                <div className="mt-3">
+                  <p className="text-xs text-amber-800 mb-2">
+                    Start window expired. Timeout is not automatic; anyone can trigger cancellation on-chain.
+                  </p>
+                  <Button
+                    onClick={handleTriggerCancelIfNotStarted}
+                    disabled={!!txLoading}
+                    variant="outline"
+                    className="w-full h-10 rounded-lg disabled:opacity-50"
+                  >
+                    {txLoading ? txLoading : 'Trigger Timeout Cancel'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {normalizedStatus === 'IN_PROGRESS' && submitDeadlineSec !== null && (
+            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-200">
+              <p className="text-sm text-blue-900">
+                Time left to submit: <span className="font-semibold">{formatRemaining(submitDeadlineSec)}</span>
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                Deadline: {formatDateTime(new Date(submitDeadlineSec * 1000).toISOString())}
+              </p>
+            </div>
+          )}
+
           {job.status === 'funded' && !isApplied && (
             <Button
               onClick={handleApply}
@@ -399,7 +603,17 @@ export default function WorkerJobDetail() {
             </Button>
           )}
 
-          {isApplied && job.status === 'accepted' && !showSubmit && (
+          {isApplied && normalizedStatus === 'ACCEPTED' && !showSubmit && (
+            <Button
+              onClick={handleStartJob}
+              disabled={!!txLoading}
+              className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg"
+            >
+              {txLoading ? txLoading : 'Start Job'}
+            </Button>
+          )}
+
+          {isApplied && normalizedStatus === 'IN_PROGRESS' && !showSubmit && (
             <Button
               onClick={() => setShowSubmit(true)}
               className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg"

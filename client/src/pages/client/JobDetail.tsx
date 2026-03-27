@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { getContract } from '@/lib/blockchain';
 import { buildEvidencePayload, hashEvidencePayload } from '@/lib/evidence';
-import { jobIdToUint256 } from '@/lib/evidence';
+import { ethers } from 'ethers';
 
 export default function ClientJobDetail() {
   const [, setLocation] = useLocation();
@@ -45,8 +45,7 @@ export default function ClientJobDetail() {
   const existingFeedback = job ? feedbacks.find((f) => f.jobId === job.id) : undefined;
   const normalizedStatus = useMemo(() => {
     if (!job) return '';
-    // accepted ~= IN_PROGRESS
-    if (job.status === 'accepted') return 'IN_PROGRESS';
+    if (job.status === 'accepted') return 'ACCEPTED';
     if (typeof job.status === 'string') return job.status.toUpperCase();
     return String(job.status);
   }, [job]);
@@ -93,7 +92,7 @@ export default function ClientJobDetail() {
       );
       if (!confirmFund) return;
 
-      const payWei = BigInt(Math.round(job.pay * 1e18));
+      const payWei = ethers.parseEther(job.pay.toString());
       const tx = await contract.fundJob(BigInt(job.onchainJobId), { value: payWei });
       await tx.wait();
       updateJobStatus(job.id, 'funded');
@@ -112,17 +111,43 @@ export default function ClientJobDetail() {
     }
   };
 
-  const handleSubmitFeedback = () => {
+  const handleSubmitFeedback = async () => {
     if (rating === 0) {
       toast.error('Please select a rating');
       return;
     }
-    submitFeedback(job.id, rating, comment, evidenceImages);
-    toast.success('Feedback submitted! Job completed.');
-    setShowFeedback(false);
-    setRating(0);
-    setComment('');
-    setEvidenceImages([]);
+    if (!job.onchainJobId) {
+      toast.error('Missing on-chain job ID');
+      return;
+    }
+
+    setTxLoading('Processing transaction...');
+    try {
+      const contract = await getContractOnce();
+      if (!contract) {
+        toast.error('Contract unavailable');
+        return;
+      }
+
+      const tx = await contract.approveJob(
+        BigInt(job.onchainJobId),
+        Number(rating),
+        comment || ''
+      );
+      await tx.wait();
+
+      submitFeedback(job.id, rating, comment, evidenceImages);
+      toast.success('Feedback submitted! Job completed and worker paid.');
+      setShowFeedback(false);
+      setRating(0);
+      setComment('');
+      setEvidenceImages([]);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.shortMessage || err?.message || 'Failed to approve job');
+    } finally {
+      setTxLoading(null);
+    }
   };
 
   const getContractOnce = async () => {
@@ -131,6 +156,134 @@ export default function ClientJobDetail() {
     if (!c) return null;
     contractRef.current = c;
     return c;
+  };
+
+  const getOnchainJobId = () => {
+    if (!job.onchainJobId) {
+      toast.error('Missing on-chain job ID');
+      return null;
+    }
+    return BigInt(job.onchainJobId);
+  };
+
+  const handleCancelJob = async () => {
+    const onchainJobId = getOnchainJobId();
+    if (onchainJobId === null) return;
+    setTxLoading('Processing transaction...');
+    try {
+      const contract = await getContractOnce();
+      if (!contract) return;
+      const onchainJob = await contract.jobs(onchainJobId);
+      const onchainStatus = Number(onchainJob.status ?? onchainJob[11]);
+      const startTime = Number(onchainJob.startTime ?? onchainJob[3]);
+      const endTime = Number(onchainJob.endTime ?? onchainJob[4]);
+      const tolerance = Number(onchainJob.tolerance ?? onchainJob[5]);
+      const submittedAt = Number(onchainJob.submittedAt ?? onchainJob[10]);
+      const nowSec = Math.floor(Date.now() / 1000);
+      const signerAddress = String(await contract.runner.getAddress()).toLowerCase();
+      const isClientSigner = signerAddress === String(job.clientAddress).toLowerCase();
+
+      let tx: any;
+      let nextStatus: 'cancelled' | 'completed' = 'cancelled';
+      let successMessage = 'Job cancelled and refunded to client.';
+      if (onchainStatus === 1) {
+        tx = await contract.cancelJob(onchainJobId);
+      } else if (onchainStatus === 2) {
+        if (nowSec > startTime + tolerance) {
+          tx = await contract.cancelIfNotStarted(onchainJobId);
+        } else {
+          if (!isClientSigner) {
+            toast.error('Only client can cancel before timeout.');
+            return;
+          }
+          tx = await contract.cancelJob(onchainJobId);
+        }
+      } else if (onchainStatus === 3) {
+        if (nowSec < endTime + tolerance) {
+          toast.error('Too early to cancel: submit timeout not reached.');
+          return;
+        }
+        tx = await contract.cancelIfNotSubmitted(onchainJobId);
+      } else if (onchainStatus === 4) {
+        const approveTimeout = Number(await contract.APPROVE_TIMEOUT());
+        if (nowSec < submittedAt + approveTimeout) {
+          toast.error('Too early for auto release.');
+          return;
+        }
+        tx = await contract.autoReleaseIfNotApproved(onchainJobId);
+        nextStatus = 'completed';
+        successMessage = 'Auto release executed. Worker paid.';
+      } else {
+        toast.error(`Cannot cancel in current on-chain status (${onchainStatus}).`);
+        return;
+      }
+
+      await tx.wait();
+      updateJobStatus(job.id, nextStatus);
+      toast.success(successMessage);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.shortMessage || err?.message || 'Failed to cancel job');
+    } finally {
+      setTxLoading(null);
+    }
+  };
+
+  const handleCancelIfNotStarted = async () => {
+    const onchainJobId = getOnchainJobId();
+    if (onchainJobId === null) return;
+    setTxLoading('Processing transaction...');
+    try {
+      const contract = await getContractOnce();
+      if (!contract) return;
+      const tx = await contract.cancelIfNotStarted(onchainJobId);
+      await tx.wait();
+      updateJobStatus(job.id, 'cancelled');
+      toast.success('Job cancelled: worker did not start in time.');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.shortMessage || err?.message || 'Too early or action failed');
+    } finally {
+      setTxLoading(null);
+    }
+  };
+
+  const handleCancelIfNotSubmitted = async () => {
+    const onchainJobId = getOnchainJobId();
+    if (onchainJobId === null) return;
+    setTxLoading('Processing transaction...');
+    try {
+      const contract = await getContractOnce();
+      if (!contract) return;
+      const tx = await contract.cancelIfNotSubmitted(onchainJobId);
+      await tx.wait();
+      updateJobStatus(job.id, 'cancelled');
+      toast.success('Job cancelled: worker did not submit in time.');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.shortMessage || err?.message || 'Too early or action failed');
+    } finally {
+      setTxLoading(null);
+    }
+  };
+
+  const handleAutoReleaseIfNotApproved = async () => {
+    const onchainJobId = getOnchainJobId();
+    if (onchainJobId === null) return;
+    setTxLoading('Processing transaction...');
+    try {
+      const contract = await getContractOnce();
+      if (!contract) return;
+      const tx = await contract.autoReleaseIfNotApproved(onchainJobId);
+      await tx.wait();
+      updateJobStatus(job.id, 'completed');
+      toast.success('Auto-released payment to worker.');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.shortMessage || err?.message || 'Too early or action failed');
+    } finally {
+      setTxLoading(null);
+    }
   };
 
   const handleRaiseDispute = async () => {
@@ -145,7 +298,8 @@ export default function ClientJobDetail() {
         toast.error('Contract unavailable');
         return;
       }
-      const onchainJobId = jobIdToUint256(job.id);
+      const onchainJobId = getOnchainJobId();
+      if (onchainJobId === null) return;
       const payload = buildEvidencePayload(disputeEvidenceText, disputeEvidenceImages);
       const evidenceHash = hashEvidencePayload(payload);
       const tx = await contract.raiseDispute(onchainJobId, evidenceHash);
@@ -175,7 +329,8 @@ export default function ClientJobDetail() {
         toast.error('Contract unavailable');
         return;
       }
-      const onchainJobId = jobIdToUint256(job.id);
+      const onchainJobId = getOnchainJobId();
+      if (onchainJobId === null) return;
       const payload = buildEvidencePayload(counterEvidenceText, counterEvidenceImages);
       const counterHash = hashEvidencePayload(payload);
       const tx = await contract.submitCounterEvidence(onchainJobId, counterHash);
@@ -258,7 +413,8 @@ export default function ClientJobDetail() {
         toast.error('Contract unavailable');
         return;
       }
-      const onchainJobId = jobIdToUint256(job.id);
+      const onchainJobId = getOnchainJobId();
+      if (onchainJobId === null) return;
       const tx = await contract.castVote(onchainJobId, voteForWorker);
       await tx.wait();
       toast.success('Vote submitted');
@@ -278,7 +434,8 @@ export default function ClientJobDetail() {
         toast.error('Contract unavailable');
         return;
       }
-      const onchainJobId = jobIdToUint256(job.id);
+      const onchainJobId = getOnchainJobId();
+      if (onchainJobId === null) return;
       const tx = await contract.resolveDispute(onchainJobId);
       await tx.wait();
       toast.success('Dispute resolved');
@@ -456,9 +613,47 @@ export default function ClientJobDetail() {
           {job.status === 'created' && (
             <Button
               onClick={handleFundJob}
-              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg"
+              disabled={!!txLoading}
+              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg disabled:opacity-50"
             >
-              Fund Job
+              {txLoading ? txLoading : 'Fund Job'}
+            </Button>
+          )}
+
+          {(normalizedStatus === 'FUNDED' || normalizedStatus === 'ACCEPTED') && (
+            <Button
+              onClick={handleCancelJob}
+              disabled={!!txLoading}
+              className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg disabled:opacity-50"
+            >
+              {txLoading ? txLoading : 'Cancel Job (Refund)'}
+            </Button>
+          )}
+
+          {normalizedStatus === 'ACCEPTED' && (
+            <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
+              <p className="text-sm text-amber-900 mb-3">
+                Timeout action is not automatic. Any wallet can trigger on-chain timeout once worker misses start window.
+              </p>
+              <Button
+                onClick={handleCancelIfNotStarted}
+                disabled={!!txLoading}
+                variant="outline"
+                className="w-full h-12 rounded-lg disabled:opacity-50"
+              >
+                {txLoading ? txLoading : 'Trigger Timeout: Cancel If Not Started'}
+              </Button>
+            </div>
+          )}
+
+          {normalizedStatus === 'IN_PROGRESS' && (
+            <Button
+              onClick={handleCancelIfNotSubmitted}
+              disabled={!!txLoading}
+              variant="outline"
+              className="w-full h-12 rounded-lg disabled:opacity-50"
+            >
+              {txLoading ? txLoading : 'Timeout: Cancel If Not Submitted'}
             </Button>
           )}
 
@@ -555,13 +750,23 @@ export default function ClientJobDetail() {
                     </Button>
                     <Button
                       onClick={handleSubmitFeedback}
-                      className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg"
+                      disabled={!!txLoading}
+                      className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-50"
                     >
-                      Submit Feedback
+                      {txLoading ? txLoading : 'Submit Feedback'}
                     </Button>
                   </div>
                 </div>
               )}
+
+              <Button
+                onClick={handleAutoReleaseIfNotApproved}
+                disabled={!!txLoading}
+                variant="outline"
+                className="w-full h-12 rounded-lg disabled:opacity-50"
+              >
+                {txLoading ? txLoading : 'Timeout: Auto Release If Not Approved'}
+              </Button>
             </>
           )}
 

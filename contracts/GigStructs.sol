@@ -18,9 +18,10 @@ struct Job {
     address worker;     
 
     uint256 pay;        // tiền trả
-    uint256 startTime;  // thời điểm bắt đầu dự kiến (unix seconds)
-    uint256 endTime;    // thời điểm kết thúc dự kiến (unix seconds)
-    uint256 tolerance;  // độ trễ cho phép (seconds)
+    
+    uint256 startTime;   // thời điểm bắt đầu dự kiến
+    uint256 endTime;     // thời điểm kết thúc dự kiến
+    uint256 tolerance;   // độ trễ cho phép (seconds)
 
     string jobHash;     // mô tả (IPFS)
     string resultHash;  // kết quả (IPFS)

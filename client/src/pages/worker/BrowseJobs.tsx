@@ -12,23 +12,44 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { formatCurrency, formatDateTime } from '@/lib/status';
 import { MapPin, DollarSign, Clock, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { getContract } from '@/lib/blockchain';
 
 export default function BrowseJobs() {
   const [, setLocation] = useLocation();
   const { currentUser, getAvailableJobs, applyForJob, getWorkerJobs } = useApp();
   const [appliedJobs, setAppliedJobs] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState('all');
 
   if (!currentUser) {
     return null;
   }
 
   const availableJobs = getAvailableJobs();
+  const filteredJobs = useMemo(() => {
+    if (statusFilter === 'all') return availableJobs;
+    return availableJobs.filter((job) => String(job.status).toUpperCase() === statusFilter);
+  }, [availableJobs, statusFilter]);
   const workerJobs = getWorkerJobs(currentUser.id);
   const appliedJobIds = workerJobs.map((j) => j.id);
 
-  const handleApply = (jobId: string) => {
+  const handleApply = async (jobId: string) => {
+    const job = availableJobs.find((j) => j.id === jobId);
+    if (!job?.onchainJobId) {
+      toast.error('Missing on-chain job ID');
+      return;
+    }
+
     try {
+      const contract = await getContract();
+      if (!contract) {
+        toast.error('Contract unavailable');
+        return;
+      }
+
+      const tx = await contract.acceptJob(BigInt(job.onchainJobId));
+      await tx.wait();
+
       const success = applyForJob(jobId);
       if (success) {
         setAppliedJobs((prev) => [...prev, jobId]);
@@ -37,8 +58,8 @@ export default function BrowseJobs() {
       } else {
         toast.error('Could not apply for this job');
       }
-    } catch (error) {
-      toast.error('Failed to apply for job');
+    } catch (error: any) {
+      toast.error(error?.shortMessage || error?.message || 'Failed to apply for job');
       console.error(error);
     }
   };
@@ -57,7 +78,22 @@ export default function BrowseJobs() {
 
       {/* Content */}
       <div className="container py-6">
-        {availableJobs.length === 0 ? (
+        <div className="mb-4">
+          <label className="text-sm text-gray-600 mr-2">Filter by status badge</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="h-10 px-3 rounded-lg border border-gray-300 bg-white text-sm"
+          >
+            <option value="all">All</option>
+            <option value="FUNDED">Funded</option>
+            <option value="ACCEPTED">Accepted</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="SUBMITTED">Submitted</option>
+            <option value="DISPUTED">Disputed</option>
+          </select>
+        </div>
+        {filteredJobs.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center border border-gray-200">
             <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <DollarSign className="w-8 h-8 text-gray-400" />
@@ -77,7 +113,7 @@ export default function BrowseJobs() {
           </div>
         ) : (
           <div className="space-y-4">
-            {availableJobs.map((job) => {
+            {filteredJobs.map((job) => {
               const isApplied = appliedJobIds.includes(job.id);
 
               return (

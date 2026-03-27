@@ -9,12 +9,29 @@ import { useLocation } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
 import { BottomNav } from '@/components/BottomNav';
 import { User, LogOut, Copy, Check } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { getContract } from '@/lib/blockchain';
+
+type ScoreHistoryItem = {
+  delta: number;
+  reason: string;
+  timestamp: number;
+};
+
+type BadgeItem = {
+  type: number;
+  jobId: string;
+  timestamp: number;
+  note: string;
+};
 
 export default function ClientProfile() {
   const [, setLocation] = useLocation();
   const { currentUser, logout, getJobsByClient } = useApp();
   const [copied, setCopied] = useState(false);
+  const [reputation, setReputation] = useState<number | null>(null);
+  const [scoreHistory, setScoreHistory] = useState<ScoreHistoryItem[]>([]);
+  const [badges, setBadges] = useState<BadgeItem[]>([]);
 
   if (!currentUser) {
     return null;
@@ -33,6 +50,55 @@ export default function ClientProfile() {
     logout();
     setLocation('/');
   };
+
+  useEffect(() => {
+    let mounted = true;
+    const loadOnchainProfile = async () => {
+      try {
+        const contract = await getContract();
+        if (!contract || !mounted) return;
+
+        const score = Number(await contract.reputationScore(currentUser.address));
+        const badgeData = await contract.getBadges(currentUser.address);
+        const scoreLogs = await contract.queryFilter(
+          contract.filters.ScoreChanged(currentUser.address)
+        );
+
+        const scoreItems: ScoreHistoryItem[] = [];
+        for (const log of scoreLogs) {
+          const oldScore = Number(log.args?.oldScore ?? 0);
+          const newScore = Number(log.args?.newScore ?? 0);
+          const delta = newScore - oldScore;
+          const reason = String(log.args?.reason ?? '');
+          const block = await log.getBlock();
+          scoreItems.push({
+            delta,
+            reason,
+            timestamp: Number(block?.timestamp ?? 0),
+          });
+        }
+
+        const badgeItems: BadgeItem[] = (badgeData[0] || []).map((type: bigint, idx: number) => ({
+          type: Number(type),
+          jobId: String((badgeData[1] || [])[idx] ?? ''),
+          timestamp: Number((badgeData[2] || [])[idx] ?? 0),
+          note: String((badgeData[3] || [])[idx] ?? ''),
+        }));
+
+        if (!mounted) return;
+        setReputation(score);
+        setScoreHistory(scoreItems.reverse());
+        setBadges(badgeItems.reverse());
+      } catch (err) {
+        console.error('Failed to load on-chain profile:', err);
+      }
+    };
+
+    loadOnchainProfile();
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser.address]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -58,7 +124,7 @@ export default function ClientProfile() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 gap-4 mb-6 pb-6 border-b border-gray-200">
+          <div className="grid grid-cols-3 gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
               <p className="text-sm text-gray-600 mb-1">Total Jobs Posted</p>
               <p className="text-2xl font-bold text-gray-900">{jobs.length}</p>
@@ -66,6 +132,10 @@ export default function ClientProfile() {
             <div>
               <p className="text-sm text-gray-600 mb-1">Jobs Completed</p>
               <p className="text-2xl font-bold text-gray-900">{completedJobs}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Reputation Score</p>
+              <p className="text-2xl font-bold text-gray-900">{reputation ?? '—'}</p>
             </div>
           </div>
 
@@ -88,6 +158,50 @@ export default function ClientProfile() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Badges */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Badges</h3>
+          {badges.length === 0 ? (
+            <p className="text-sm text-gray-600">No badges yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {badges.map((badge, idx) => (
+                <div key={idx} className="rounded-lg border border-gray-200 p-3">
+                  <p className="text-sm font-semibold text-gray-900">{badge.note}</p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Type #{badge.type} · Job #{badge.jobId} · {new Date(badge.timestamp * 1000).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Reputation History */}
+        <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Reputation History</h3>
+          {scoreHistory.length === 0 ? (
+            <p className="text-sm text-gray-600">No score changes yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {scoreHistory.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between rounded-lg border border-gray-200 p-3">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">{item.reason}</p>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {new Date(item.timestamp * 1000).toLocaleString()}
+                    </p>
+                  </div>
+                  <p className={`text-sm font-semibold ${item.delta >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                    {item.delta >= 0 ? '+' : ''}
+                    {item.delta}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Logout Button */}
