@@ -42,7 +42,7 @@ interface AppContextType {
   // Dispute metadata actions
   setDisputeInitiator: (jobId: string, initiatorAddress: string) => void;
   setDisputeVoters: (jobId: string, voters: string[]) => void;
-  setDisputeResolved: (jobId: string, workerWon: boolean) => void;
+  setDisputeResolved: (jobId: string, outcome: 'CLIENT_WON' | 'WORKER_WON' | 'DRAW') => void;
 
   // Notification actions
   addNotification: (n: Omit<Notification, 'id' | 'timestamp' | 'read'>) => void;
@@ -432,14 +432,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [addNotification]);
 
-  const setDisputeResolved = useCallback((jobId: string, workerWon: boolean) => {
+  const setDisputeResolved = useCallback((jobId: string, outcome: 'CLIENT_WON' | 'WORKER_WON' | 'DRAW') => {
     setJobs((prev) =>
       prev.map((job) =>
         job.id === jobId
           ? {
               ...job,
               disputeResolved: true,
-              disputeWorkerWon: workerWon,
+              disputeWorkerWon: outcome === 'WORKER_WON', // legacy support
+              disputeOutcome: outcome,
               status: 'resolved' as JobStatus,
               updatedAt: new Date().toISOString(),
             }

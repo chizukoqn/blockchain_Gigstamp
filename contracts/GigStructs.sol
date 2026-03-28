@@ -13,6 +13,13 @@ enum JobStatus {
     RESOLVED    // 8: tranh chấp đã có kết quả
 }
 
+enum DisputeOutcome {
+    PENDING,
+    CLIENT_WON,
+    WORKER_WON,
+    DRAW
+}
+
 struct Job {
     address client;    
     address worker;     
@@ -53,5 +60,5 @@ struct Dispute {
     uint8   votesForClient;   // đếm số phiếu cho client
     uint256 deadline;         // thời hạn bỏ phiếu
     bool    resolved;         // đã kết luận chưa
-    bool    workerWon;        // kết quả cuối: worker thắng?
+    DisputeOutcome outcome;   // kết quả cuối
 }

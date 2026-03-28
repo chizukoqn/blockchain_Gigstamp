@@ -296,10 +296,10 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
         Job storage job = jobs[jobId];
         require(job.status == JobStatus.DISPUTED, "Not disputed");
 
-        bool workerWon = _resolveDispute(jobId);
+        DisputeOutcome outcome = _resolveDispute(jobId);
         job.status     = JobStatus.RESOLVED;
 
-        if (workerWon) {
+        if (outcome == DisputeOutcome.WORKER_WON) {
             // Worker thắng: nhận tiền
             _subScore(job.client, 10, "lost_dispute");
             _addBadge(job.client, BadgeType.LOST_DISPUTE_CLIENT, jobId);
@@ -308,14 +308,25 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
             
             (bool ok, ) = job.worker.call{value: job.pay}("");
             require(ok, "Transfer failed");
-        } else {
+        } else if (outcome == DisputeOutcome.CLIENT_WON) {
             // Client thắng: nhận refund
             _subScore(job.worker, 10, "lost_dispute");
             _addBadge(job.worker, BadgeType.LOST_DISPUTE, jobId);
 
-            _addScore(job.client, 10, "won_dispute");  // 👈 bạn đề xuất +score client thắng dispute
+            _addScore(job.client, 10, "won_dispute");  
             (bool ok, ) = job.client.call{value: job.pay}("");
             require(ok, "Transfer failed");
+        } else if (outcome == DisputeOutcome.DRAW) {
+            // Hòa: Chia đôi tiền, không gán badge, không đổi score
+            uint256 half = job.pay / 2;
+            
+            // Trả client
+            (bool ok1, ) = job.client.call{value: half}("");
+            require(ok1, "Transfer failed (client)");
+            
+            // Trả worker (phần còn lại để tránh lẻ wei)
+            (bool ok2, ) = job.worker.call{value: job.pay - half}("");
+            require(ok2, "Transfer failed (worker)");
         }
     }
 

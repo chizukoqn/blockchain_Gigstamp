@@ -73,9 +73,9 @@
       },
       {
         "indexed": false,
-        "internalType": "bool",
-        "name": "workerWon",
-        "type": "bool"
+        "internalType": "enum DisputeOutcome",
+        "name": "outcome",
+        "type": "uint8"
       }
     ],
     "name": "DisputeResolved",
@@ -517,9 +517,9 @@
         "type": "bool"
       },
       {
-        "internalType": "bool",
-        "name": "workerWon",
-        "type": "bool"
+        "internalType": "enum DisputeOutcome",
+        "name": "outcome",
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",

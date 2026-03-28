@@ -17,7 +17,7 @@ import { formatDateTime } from '@/lib/status';
 import {
   ArrowLeft, Scale, User, Briefcase, Clock, FileText,
   CheckCircle, XCircle, AlertTriangle, ThumbsUp, ThumbsDown,
-  Shield, Eye, Upload, LucideIcon
+  Shield, Eye, Upload, Info, LucideIcon
 } from 'lucide-react';
 import { WorkerProfile } from '@/components/WorkerProfile';
 import { ClientProfileCard } from '@/components/ClientProfileCard';
@@ -277,26 +277,30 @@ export default function DisputePage() {
       const tx = await contract.resolveDispute(BigInt(job.onchainJobId));
       const receipt = await tx.wait();
 
-      // Tìm event DisputeResolved để lấy workerWon
-      let workerWon = false;
+      // Tìm event DisputeResolved để lấy outcome
+      let outcome: 'CLIENT_WON' | 'WORKER_WON' | 'DRAW' = 'CLIENT_WON';
       try {
         const iface = contract.interface;
         for (const log of receipt.logs) {
           try {
             const parsed = iface.parseLog(log);
             if (parsed?.name === 'DisputeResolved') {
-              workerWon = parsed.args.workerWon;
+              const resNum = Number(parsed.args.outcome);
+              if (resNum === 3) outcome = 'DRAW';
+              else if (resNum === 2) outcome = 'WORKER_WON';
+              else outcome = 'CLIENT_WON';
               break;
             }
           } catch { /* skip */ }
         }
       } catch { /* fallback */ }
 
-      setDisputeResolved(job.id, workerWon);
+      setDisputeResolved(job.id, outcome);
       updateJobStatus(job.id, 'resolved' as any);
 
       // Tạo notification cho cả 3 bên
-      const winner = workerWon ? 'Worker' : 'Client';
+      const outcomeText = outcome === 'DRAW' ? 'Draw' : (outcome === 'WORKER_WON' ? 'Worker Won' : 'Client Won');
+      const winner = outcome === 'DRAW' ? 'None (Draw)' : (outcome === 'WORKER_WON' ? 'Worker' : 'Client');
       const jobShortId = job.id.slice(0, 6).toUpperCase();
       const notifMsg = `Dispute for Job #${jobShortId} has been resolved. Winner: ${winner}`;
       [
@@ -410,9 +414,11 @@ export default function DisputePage() {
             Job Info
           </h2>
           <div className="space-y-3">
-            <InfoRow label="Job ID (local)" value={`#${job.id.slice(0, 8).toUpperCase()}`} />
+            <InfoRow label="Job Title" value={<span className="font-black text-violet-300">{job.title}</span>} />
+            <div className="pt-2 border-t border-white/5" />
+            <InfoRow label="Local ID" value={`#${job.id.slice(0, 8).toUpperCase()}`} />
             {job.onchainJobId && (
-              <InfoRow label="On-chain Job ID" value={`#${job.onchainJobId}`} />
+              <InfoRow label="On-chain ID" value={`#${job.onchainJobId}`} />
             )}
             <InfoRow label="Description" value={job.description} />
             <InfoRow label="Created At" value={formatDateTime(job.createdAt)} />
@@ -624,7 +630,7 @@ export default function DisputePage() {
                   <div>
                     <p className="text-white font-semibold">Voting Complete</p>
                     <p className="text-amber-200/70 text-sm">
-                      {t.dispute_voter_progress || 'Voter progress'}: {Object.values(voterStatuses).filter(v => v).length} / {job.disputeVoters?.length || 3}
+                      {t.dispute_votes_progress || 'Voter progress'}: {Object.values(voterStatuses).filter(v => v).length} / {job.disputeVoters?.length || 3}
                       <br />
                       {t.dispute_voted_for || 'You voted for'}: <span className="font-bold text-amber-300">{myVoteChoice ? t.role_worker : t.role_client}</span>
                     </p>
@@ -709,32 +715,41 @@ export default function DisputePage() {
         {/* ── Resolved Result Banner ── */}
         {isResolved && (
           <div className={`rounded-2xl p-6 border ${
-            job.disputeWorkerWon
+            job.disputeOutcome === 'WORKER_WON'
               ? 'border-emerald-500/40 bg-emerald-500/10'
-              : 'border-blue-500/40 bg-blue-500/10'
+              : job.disputeOutcome === 'DRAW'
+                ? 'border-amber-500/40 bg-amber-500/10'
+                : 'border-blue-500/40 bg-blue-500/10'
           }`}>
             <div className="flex items-center gap-3 mb-3">
-              {job.disputeWorkerWon ? (
+              {job.disputeOutcome === 'WORKER_WON' ? (
                 <CheckCircle className="w-8 h-8 text-emerald-400" />
+              ) : job.disputeOutcome === 'DRAW' ? (
+                <Info className="w-8 h-8 text-amber-400" />
               ) : (
                 <CheckCircle className="w-8 h-8 text-blue-400" />
               )}
               <div>
                 <h3 className="text-lg font-bold text-white">{t.dispute_resolved}</h3>
-                <p className={`font-semibold ${job.disputeWorkerWon ? 'text-emerald-300' : 'text-blue-300'}`}>
-                  🏆 {t.dispute_winner}: {job.disputeWorkerWon ? t.role_worker : t.role_client}
+                <p className={`font-semibold ${
+                  job.disputeOutcome === 'WORKER_WON' ? 'text-emerald-300' : 
+                  job.disputeOutcome === 'DRAW' ? 'text-amber-300' : 'text-blue-300'
+                }`}>
+                  {job.disputeOutcome === 'DRAW' 
+                    ? '🤝 Result: Draw (Tie)' 
+                    : `🏆 ${t.dispute_winner}: ${job.disputeOutcome === 'WORKER_WON' ? t.role_worker : t.role_client}`}
                 </p>
               </div>
             </div>
-            {job.disputeWorkerWon !== undefined && (
-              <div className="rounded-xl p-3 bg-white/10">
-                <p className="text-sm text-white/70">
-                  {job.disputeWorkerWon
-                    ? `✅ ${t.dispute_worker_won}`
+            <div className="rounded-xl p-3 bg-white/10">
+              <p className="text-sm text-white/70">
+                {job.disputeOutcome === 'WORKER_WON'
+                  ? `✅ ${t.dispute_worker_won}`
+                  : job.disputeOutcome === 'DRAW'
+                    ? `🤝 The dispute ended in a tie. The total payment has been split 50/50 between the Client and the Worker.`
                     : `✅ ${t.dispute_client_won}`}
-                </p>
-              </div>
-            )}
+              </p>
+            </div>
           </div>
         )}
 
@@ -745,7 +760,7 @@ export default function DisputePage() {
 
 // ── Helper Components ──────────────────────────────────────────
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between items-start gap-4">
       <span className="text-sm text-white/50 flex-shrink-0">{label}</span>

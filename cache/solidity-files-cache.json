@@ -118,8 +118,8 @@
       ]
     },
     "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\GigStamp.sol": {
-      "lastModificationDate": 1774686721014,
-      "contentHash": "2098c30c6280a960e2fab41f0da592bc",
+      "lastModificationDate": 1774706043058,
+      "contentHash": "d0bdb38dcbd09ddac1278b97c3265f46",
       "sourceName": "contracts/GigStamp.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -160,8 +160,8 @@
       ]
     },
     "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\GigStructs.sol": {
-      "lastModificationDate": 1774582121229,
-      "contentHash": "987612ddfdaf5657600d70a55b3ce6f1",
+      "lastModificationDate": 1774706013452,
+      "contentHash": "8b0ab746c17b5989d13ec389a5c15454",
       "sourceName": "contracts/GigStructs.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -195,8 +195,8 @@
       "artifacts": []
     },
     "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\DisputeManager.sol": {
-      "lastModificationDate": 1774629139914,
-      "contentHash": "44ad45fd12f290511d5a0a9f50cbf73c",
+      "lastModificationDate": 1774706032780,
+      "contentHash": "8712e8882588af90118a22bf6b32e9f7",
       "sourceName": "contracts/DisputeManager.sol",
       "solcConfig": {
         "version": "0.8.20",

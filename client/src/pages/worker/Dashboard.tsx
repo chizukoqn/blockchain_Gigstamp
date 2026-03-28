@@ -189,11 +189,11 @@ export default function WorkerDashboard() {
                   onClick={() => setLocation(`/worker/job/${job.id}`)}
                 >
                   <div>
-                    <p className="font-semibold text-gray-900">
-                      Job #{job.id.slice(0, 6).toUpperCase()}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {job.description.slice(0, 50)}...
+                    <h4 className="font-bold text-gray-900 truncate max-w-[200px]">
+                      {job.title}
+                    </h4>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
+                      ID {job.id.slice(0, 6).toUpperCase()}
                     </p>
                   </div>
                   <div className="text-right">

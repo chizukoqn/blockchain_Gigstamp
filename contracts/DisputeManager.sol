@@ -23,7 +23,7 @@ contract DisputeManager is VoterSelector {
         uint8   votesForClient;
         uint256 deadline;
         bool    resolved;
-        bool    workerWon;
+        DisputeOutcome outcome;
     }
 
     mapping(uint256 => DisputeData)              public  disputes;
@@ -36,7 +36,7 @@ contract DisputeManager is VoterSelector {
     event CounterEvidenceSubmitted(uint256 indexed jobId, address indexed responder);
     event VoterSelected(uint256 indexed jobId, address[] voters);
     event Voted(uint256 indexed jobId, address indexed voter, bool voteForWorker);
-    event DisputeResolved(uint256 indexed jobId, bool workerWon);
+    event DisputeResolved(uint256 indexed jobId, DisputeOutcome outcome);
     event VotersReplaced(uint256 indexed jobId, address[] newVoters, uint256 newDeadline);
 
     // ── Bước 8: Raise dispute ───────────────────────────────────
@@ -126,7 +126,7 @@ contract DisputeManager is VoterSelector {
 
     // ── Bước 11: Resolve theo đa số ────────────────────────────
     // Trả về true nếu worker thắng
-    function _resolveDispute(uint256 jobId) internal returns (bool workerWon) {
+    function _resolveDispute(uint256 jobId) internal returns (DisputeOutcome outcome) {
         DisputeData storage d = disputes[jobId];
         require(d.deadline > 0,               "No dispute");
         require(!d.resolved,                  "Already resolved");
@@ -137,23 +137,34 @@ contract DisputeManager is VoterSelector {
         ); // resolve sớm nếu tất cả đã vote
 
         d.resolved  = true;
-        workerWon   = d.votesForWorker > d.votesForClient;
-        d.workerWon = workerWon;
+        
+        if (d.votesForWorker == d.votesForClient) {
+            outcome = DisputeOutcome.DRAW;
+        } else if (d.votesForWorker > d.votesForClient) {
+            outcome = DisputeOutcome.WORKER_WON;
+        } else {
+            outcome = DisputeOutcome.CLIENT_WON;
+        }
+        
+        d.outcome = outcome;
 
-        emit DisputeResolved(jobId, workerWon);
+        emit DisputeResolved(jobId, outcome);
 
-        // Cập nhật score voter
-        for (uint8 i = 0; i < d.voterCount; i++) {
-            address v = d.voters[i];
-            if (!hasVoted[jobId][v]) continue; // voter không bỏ phiếu → bỏ qua
+        // Cập nhật score voter (Chỉ khi có người thắng rõ ràng)
+        if (outcome != DisputeOutcome.DRAW) {
+            bool workerWon = (outcome == DisputeOutcome.WORKER_WON);
+            for (uint8 i = 0; i < d.voterCount; i++) {
+                address v = d.voters[i];
+                if (!hasVoted[jobId][v]) continue; 
 
-            bool votedForWorker = voteChoice[jobId][v];
-            bool votedCorrectly = (votedForWorker == workerWon);
+                bool votedForWorker = voteChoice[jobId][v];
+                bool votedCorrectly = (votedForWorker == workerWon);
 
-            if (votedCorrectly) {
-                _addScore(v, 3, "voted_correctly");
-            } else {
-                _subScore(v, 3, "voted_wrongly");
+                if (votedCorrectly) {
+                    _addScore(v, 3, "voted_correctly");
+                } else {
+                    _subScore(v, 3, "voted_wrongly");
+                }
             }
         }
     }

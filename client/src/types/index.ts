@@ -83,7 +83,8 @@ export interface Job {
   disputeInitiator?: string;    // address của người khởi tạo dispute
   disputeVoters?: string[];     // danh sách address voter (fetch on-chain)
   disputeResolved?: boolean;    // dispute đã resolve chưa
-  disputeWorkerWon?: boolean;   // kết quả: worker thắng?
+  disputeWorkerWon?: boolean;   // kết quả: worker thắng? (legacy)
+  disputeOutcome?: 'CLIENT_WON' | 'WORKER_WON' | 'DRAW'; // kết quả mới
   status: JobStatus;
   distance?: string;
   createdAt: string;
