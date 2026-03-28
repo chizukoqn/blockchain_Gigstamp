@@ -8,6 +8,7 @@ import { useLocation } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
 import { Home, Plus, User, LogOut, Scale, Bell, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { translations } from '@/lib/translations';
 
 interface NavItem {
   label: string;
@@ -20,7 +21,8 @@ const PUBLIC_ROUTES = ['/', '/login', '/register', '/demo'];
 
 export function BottomNav() {
   const [location, setLocation] = useLocation();
-  const { currentUser, logout, getUnreadCount } = useApp();
+  const { currentUser, logout, getUnreadCount, language } = useApp();
+  const t = translations[language];
 
   // Never show on public / auth pages
   if (!currentUser || PUBLIC_ROUTES.includes(location)) {
@@ -32,18 +34,18 @@ export function BottomNav() {
 
   const navItems: NavItem[] = isClient
     ? [
-        { label: 'Home', icon: <Home className="w-5 h-5" />, path: '/client/dashboard' },
+        { label: t.nav_home, icon: <Home className="w-5 h-5" />, path: '/client/dashboard' },
         { label: 'Create', icon: <Plus className="w-5 h-5" />, path: '/client/create-job' },
-        { label: 'Disputes', icon: <Scale className="w-5 h-5" />, path: '/disputes' },
-        { label: 'Notifs', icon: <Bell className="w-5 h-5" />, path: '/notifications', badge: unreadCount },
-        { label: 'Profile', icon: <User className="w-5 h-5" />, path: '/client/profile' },
+        { label: t.nav_disputes, icon: <Scale className="w-5 h-5" />, path: '/disputes' },
+        { label: t.nav_notifs, icon: <Bell className="w-5 h-5" />, path: '/notifications', badge: unreadCount },
+        { label: t.nav_profile, icon: <User className="w-5 h-5" />, path: '/client/profile' },
       ]
     : [
-        { label: 'Home', icon: <Home className="w-5 h-5" />, path: '/worker/dashboard' },
-        { label: 'Browse', icon: <Search className="w-5 h-5" />, path: '/worker/browse-jobs' },
-        { label: 'Disputes', icon: <Scale className="w-5 h-5" />, path: '/disputes' },
-        { label: 'Notifs', icon: <Bell className="w-5 h-5" />, path: '/notifications', badge: unreadCount },
-        { label: 'Profile', icon: <User className="w-5 h-5" />, path: '/worker/profile' },
+        { label: t.nav_home, icon: <Home className="w-5 h-5" />, path: '/worker/dashboard' },
+        { label: t.nav_browse, icon: <Search className="w-5 h-5" />, path: '/worker/browse-jobs' },
+        { label: t.nav_disputes, icon: <Scale className="w-5 h-5" />, path: '/disputes' },
+        { label: t.nav_notifs, icon: <Bell className="w-5 h-5" />, path: '/notifications', badge: unreadCount },
+        { label: t.nav_profile, icon: <User className="w-5 h-5" />, path: '/worker/profile' },
       ];
 
   return (

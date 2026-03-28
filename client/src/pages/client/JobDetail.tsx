@@ -16,11 +16,15 @@ import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { getContract } from '@/lib/blockchain';
 import { buildEvidencePayload, hashEvidencePayload } from '@/lib/evidence';
 import { ethers } from 'ethers';
+import { WorkerProfile } from '@/components/WorkerProfile';
+import { X, Upload, AlertTriangle } from 'lucide-react';
+import { translations } from '@/lib/translations';
 
 export default function ClientJobDetail() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute('/client/job/:jobId');
-  const { getJobById, updateJobStatus, submitFeedback, feedbacks, setDisputeEvidence, setDisputeInitiator, setDisputeVoters, addNotification, currentUser } = useApp();
+  const { getJobById, updateJobStatus, submitFeedback, feedbacks, setDisputeEvidence, setDisputeInitiator, setDisputeVoters, addNotification, currentUser, language } = useApp();
+  const t = translations[language];
   const [showFeedback, setShowFeedback] = useState(false);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -50,12 +54,12 @@ export default function ClientJobDetail() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Job not found</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t.job_not_found}</h1>
           <Button
             onClick={() => setLocation('/client/dashboard')}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
           >
-            Back to Dashboard
+            {t.back}
           </Button>
         </div>
       </div>
@@ -410,10 +414,15 @@ export default function ClientJobDetail() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Job #{job.id.slice(0, 6).toUpperCase()}
+              <h1 className="text-2xl font-black text-gray-900 leading-tight">
+                {job.title}
               </h1>
-              <StatusBadge status={job.status} className="mt-2" />
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                  ID {job.id.slice(0, 6).toUpperCase()}
+                </span>
+                <StatusBadge status={job.status} />
+              </div>
             </div>
           </div>
         </div>
@@ -423,18 +432,18 @@ export default function ClientJobDetail() {
       <div className="container py-6 max-w-2xl">
         {/* Status Timeline */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Job Progress</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">{t.job_progress}</h2>
           <StatusTimeline currentStatus={job.status} />
         </div>
 
         {/* Job Details */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Job Details</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">{t.job_details_title}</h2>
           <div className="space-y-4">
             <div className="flex items-start gap-3">
               <DollarSign className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
               <div>
-                <p className="text-sm text-gray-600">Pay Amount</p>
+                <p className="text-sm text-gray-600">{t.job_pay_amount} (ETH)</p>
                 <p className="text-lg font-semibold text-gray-900">
                   {formatCurrency(job.pay)}
                 </p>
@@ -443,7 +452,7 @@ export default function ClientJobDetail() {
             <div className="flex items-start gap-3">
               <Clock className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
               <div>
-                <p className="text-sm text-gray-600">Start Date</p>
+                <p className="text-sm text-gray-600">{t.job_start_date}</p>
                 <p className="text-lg font-semibold text-gray-900">
                   {formatDateTime(job.startTime)}
                 </p>
@@ -461,7 +470,7 @@ export default function ClientJobDetail() {
             <div className="flex items-start gap-3">
               <Clock className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
               <div>
-                <p className="text-sm text-gray-600">Tolerance</p>
+                <p className="text-sm text-gray-600">{t.job_tolerance}</p>
                 <p className="text-lg font-semibold text-gray-900">
                   {job.tolerance}s
                 </p>
@@ -470,9 +479,9 @@ export default function ClientJobDetail() {
             <div className="flex items-start gap-3">
               <MapPin className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" />
               <div>
-                <p className="text-sm text-gray-600">Location</p>
+                <p className="text-sm text-gray-600">{t.job_location}</p>
                 <p className="text-lg font-semibold text-gray-900">
-                  {job.location}
+                  {job.location || t.unknown}
                 </p>
               </div>
             </div>
@@ -488,7 +497,7 @@ export default function ClientJobDetail() {
         {/* Worker Submission */}
         {job.status === 'submitted' && (
           <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Work Submitted</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">{t.job_worker_submission}</h2>
 
             {job.submissionDescription && (
               <div className="mb-4">
@@ -499,7 +508,7 @@ export default function ClientJobDetail() {
 
             {job.submissionEvidenceImages?.length ? (
               <div>
-                <p className="text-sm text-gray-600 mb-2">Minh chứng ảnh</p>
+                <p className="text-sm text-gray-600 mb-2">{t.job_submission_evidence}</p>
                 <div className="grid grid-cols-2 gap-2">
                   {job.submissionEvidenceImages.map((src, idx) => (
                     <img
@@ -517,61 +526,47 @@ export default function ClientJobDetail() {
 
         {/* Worker Info */}
         {job.workerAddress && (
-          <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Assigned Worker</h2>
-            <p className="text-gray-700 font-mono">
-              {job.workerAddress}
-            </p>
+          <div className="mt-6">
+            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3 px-2">{t.job_assigned_worker}</h2>
+            <WorkerProfile workerAddress={job.workerAddress} />
           </div>
         )}
 
         {/* Actions */}
         <div className="space-y-3">
           {job.status === 'created' && (
-            <Button
-              onClick={handleFundJob}
-              disabled={!!txLoading}
-              className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg disabled:opacity-50"
-            >
-              {txLoading ? txLoading : 'Fund Job'}
-            </Button>
-          )}
-
-          {(normalizedStatus === 'FUNDED' || normalizedStatus === 'ACCEPTED') && (
-            <Button
-              onClick={handleCancelJob}
-              disabled={!!txLoading}
-              className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg disabled:opacity-50"
-            >
-              {txLoading ? txLoading : 'Cancel Job (Refund)'}
-            </Button>
-          )}
-
-          {normalizedStatus === 'ACCEPTED' && (
-            <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200">
-              <p className="text-sm text-amber-900 mb-3">
-                Timeout action is not automatic. Any wallet can trigger on-chain timeout once worker misses start window.
-              </p>
+            <div className="flex gap-3">
               <Button
-                onClick={handleCancelIfNotStarted}
+                onClick={handleFundJob}
+                disabled={!!txLoading}
+                className="flex-[2] h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg disabled:opacity-50"
+              >
+                {txLoading ? txLoading : t.job_fund_btn}
+              </Button>
+              <Button
+                onClick={handleCancelJob}
                 disabled={!!txLoading}
                 variant="outline"
-                className="w-full h-12 rounded-lg disabled:opacity-50"
+                className="flex-1 h-12 border-rose-200 text-rose-600 hover:bg-rose-50 font-semibold rounded-lg"
               >
-                {txLoading ? txLoading : 'Trigger Timeout: Cancel If Not Started'}
+                Cancel
               </Button>
             </div>
           )}
 
-          {normalizedStatus === 'IN_PROGRESS' && (
-            <Button
-              onClick={handleCancelIfNotSubmitted}
-              disabled={!!txLoading}
-              variant="outline"
-              className="w-full h-12 rounded-lg disabled:opacity-50"
-            >
-              {txLoading ? txLoading : 'Timeout: Cancel If Not Submitted'}
-            </Button>
+          {(normalizedStatus === 'FUNDED' || normalizedStatus === 'ACCEPTED' || normalizedStatus === 'IN_PROGRESS') && (
+            <div className="space-y-3">
+              <Button
+                onClick={handleCancelJob}
+                disabled={!!txLoading}
+                className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg disabled:opacity-50"
+              >
+                {txLoading ? txLoading : 'Cancel Job'}
+              </Button>
+              <p className="text-xs text-gray-500 text-center italic">
+                Note: Job can only be cancelled after deadlines if worker fails to start/submit.
+              </p>
+            </div>
           )}
 
           {job.status === 'submitted' && (
@@ -581,12 +576,12 @@ export default function ClientJobDetail() {
                   onClick={handleApproveJob}
                   className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg"
                 >
-                  Approve & Rate
+                  {t.job_rate_worker}
                 </Button>
               ) : (
                 <div className="bg-white rounded-2xl p-6 border border-gray-200">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Rate the Worker
+                    {t.job_rate_worker}
                   </h3>
 
                   {/* Star Rating */}
@@ -606,7 +601,7 @@ export default function ClientJobDetail() {
 
                   {/* Comment */}
                   <textarea
-                    placeholder="Share your feedback (optional)"
+                    placeholder={t.job_feedback_optional}
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     rows={3}
@@ -617,7 +612,7 @@ export default function ClientJobDetail() {
                 <div className="mb-4">
                   <div className="flex items-center justify-between gap-3 mb-2">
                     <h4 className="text-sm font-semibold text-gray-900">
-                      Minh chứng ảnh
+                      {t.job_submission_evidence}
                     </h4>
                     <p className="text-xs text-gray-500">
                       (1 hoặc nhiều ảnh)
@@ -670,7 +665,7 @@ export default function ClientJobDetail() {
                       disabled={!!txLoading}
                       className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-50"
                     >
-                      {txLoading ? txLoading : 'Submit Feedback'}
+                      {txLoading ? txLoading : t.job_submit_feedback}
                     </Button>
                   </div>
                 </div>
@@ -690,13 +685,13 @@ export default function ClientJobDetail() {
           {job.status === 'completed' && (
             <div className="bg-green-50 rounded-2xl p-4 border border-green-200 text-center">
               <p className="text-green-800 font-semibold">
-                Job completed and rated
+                {t.job_completed_rated}
               </p>
 
               {existingFeedback && (
                 <div className="mt-3 text-left">
                   <p className="text-sm text-green-900">
-                    Rating: {existingFeedback.rating}/5
+                    {t.job_rating}: {existingFeedback.rating}/5
                   </p>
                   {existingFeedback.comment && (
                     <p className="text-sm text-green-900 mt-1">
@@ -722,60 +717,73 @@ export default function ClientJobDetail() {
 
           {/* Dispute: Raise Dispute */}
           {(normalizedStatus === 'IN_PROGRESS' || normalizedStatus === 'SUBMITTED') && (
-            <div className="bg-orange-50 rounded-2xl p-6 border border-orange-200">
-              <h3 className="text-lg font-semibold text-orange-900 mb-2">Raise Dispute</h3>
-              <p className="text-sm text-orange-800 mb-4">
-                Provide evidence as text, images, or both. We will auto-hash it for on-chain submission.
+            <div className="bg-orange-50 rounded-2xl p-6 border border-orange-200 space-y-4 shadow-sm">
+              <h3 className="text-lg font-bold text-orange-900 border-b border-orange-200 pb-2 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                {t.job_raise_dispute}
+              </h3>
+              <p className="text-sm text-orange-800/80 mb-4">
+                {t.job_provide_evidence_desc}
               </p>
 
               <textarea
                 value={disputeEvidenceText}
                 onChange={(e) => setDisputeEvidenceText(e.target.value)}
                 placeholder="Evidence text (optional)"
-                rows={3}
-                className="w-full px-3 py-2 rounded-lg border border-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none mb-3"
+                rows={4}
+                className="w-full px-4 py-3 rounded-xl border border-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:bg-white bg-white/50 transition-all resize-none mb-3 shadow-inner"
               />
 
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                disabled={disputeUploading}
-                onChange={handleDisputeEvidenceImagesChange}
-                className="w-full text-sm text-orange-900 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border file:border-orange-200 file:bg-white file:text-orange-900 hover:file:bg-orange-50 disabled:opacity-50 mb-3"
-              />
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="sr-only">Choose evidence photo</span>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-orange-300 border-dashed rounded-xl cursor-pointer hover:border-orange-500 hover:bg-orange-50 transition-all">
+                    <Upload className="w-5 h-5 text-orange-600" />
+                    <span className="text-sm font-bold text-orange-600">Choose Evidence Photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      disabled={disputeUploading}
+                      onChange={handleDisputeEvidenceImagesChange}
+                      className="hidden"
+                    />
+                  </div>
+                </label>
 
-              {disputeEvidenceImages.length > 0 && (
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  {disputeEvidenceImages.map((src, idx) => (
-                    <div key={idx} className="relative">
-                      <img
-                        src={src}
-                        alt={`dispute-evidence-${idx}`}
-                        className="w-full h-24 object-cover rounded-lg border border-orange-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveDisputeImage(idx)}
-                        className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-white border border-orange-200 shadow text-orange-900 hover:bg-orange-50"
-                        aria-label="Remove image"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+                {disputeEvidenceImages.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    {disputeEvidenceImages.map((src, idx) => (
+                      <div key={idx} className="relative group">
+                        <img
+                          src={src}
+                          alt={`dispute-evidence-${idx}`}
+                          className="w-full h-28 object-cover rounded-xl border border-orange-200 shadow-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDisputeImage(idx)}
+                          className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-red-500 text-white shadow-lg flex items-center justify-center hover:bg-red-600 transition-all"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <Button
                 onClick={handleRaiseDispute}
                 disabled={!!txLoading}
-                className="w-full h-11 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg disabled:opacity-50"
+                className="w-full h-12 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-lg shadow-orange-600/20"
               >
-                {txLoading ? txLoading : 'Raise Dispute'}
+                {txLoading ? txLoading : t.job_raise_dispute}
               </Button>
             </div>
           )}
+
+
           {/* Dispute: Active or Resolved banner */}
           {(normalizedStatus === 'DISPUTED' || normalizedStatus === 'RESOLVED') && (
             <div className={`rounded-2xl p-6 border ${

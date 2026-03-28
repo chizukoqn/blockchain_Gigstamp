@@ -15,6 +15,7 @@ interface AppContextType {
   feedbacks: Feedback[];
   workerStats: Record<string, WorkerStats>;
   notifications: Notification[];
+  language: 'en';
 
   // Auth actions
   connectWallet: () => Promise<void>;
@@ -23,6 +24,7 @@ interface AppContextType {
 
   // Job actions
   createJob: (
+    title: string,
     pay: number,
     startTime: string,
     endTime: string,
@@ -73,6 +75,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [workerStats, setWorkerStats] = useState<Record<string, WorkerStats>>({});
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [language] = useState<'en'>('en');
 
   // Load state from localStorage on mount
   useEffect(() => {
@@ -93,9 +96,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Save state to localStorage whenever it changes
   const saveState = useCallback(() => {
-    const state = { currentUser, jobs, feedbacks, workerStats, notifications };
+    const state = { currentUser, jobs, feedbacks, workerStats, notifications, language };
     localStorage.setItem('gigstamp-state', JSON.stringify(state));
-  }, [currentUser, jobs, feedbacks, workerStats, notifications]);
+  }, [currentUser, jobs, feedbacks, workerStats, notifications, language]);
 
   useEffect(() => {
     saveState();
@@ -109,7 +112,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         (existing) =>
           existing.type === n.type &&
           existing.jobId === n.jobId &&
-          existing.targetAddress === n.targetAddress
+          existing.targetAddress?.toLowerCase() === n.targetAddress?.toLowerCase()
       );
       if (isDuplicate) return prev;
 
@@ -135,7 +138,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const getUnreadCount = useCallback(
     (address: string) =>
-      notifications.filter((n) => n.targetAddress === address && !n.read).length,
+      notifications.filter((n) => n.targetAddress?.toLowerCase() === address.toLowerCase() && !n.read).length,
     [notifications]
   );
 
@@ -146,7 +149,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const contract = await getContract();
     if (!contract) {
       alert(
-        "Không thể kết nối contract. Vui lòng đảm bảo `VITE_CONTRACT_ADDRESS` trỏ đúng địa chỉ contract đã deploy."
+        "Failed to connect to the contract. Please ensure VITE_CONTRACT_ADDRESS points to the correct deployed address."
       );
       setCurrentUser(null);
       return;
@@ -211,6 +214,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const createJob = useCallback((
+    title: string,
     pay: number,
     startTime: string,
     endTime: string,
@@ -232,6 +236,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const newJob: Job = {
       id: nanoid(10),
       onchainJobId,
+      title,
       clientId: currentUser.id,
       clientAddress: currentUser.address,
       pay,
@@ -259,14 +264,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addNotification({
           type: 'job_started',
           jobId,
-          message: `Worker đã bắt đầu làm Job #${jobId.slice(0, 6).toUpperCase()}`,
+          message: `Worker has started working on Job #${jobId.slice(0, 6).toUpperCase()}`,
           targetAddress: job.clientAddress,
         });
       } else if (status === 'cancelled' && job.workerAddress) {
         addNotification({
           type: 'job_cancelled',
           jobId,
-          message: `Client đã hủy Job #${jobId.slice(0, 6).toUpperCase()} mà bạn đã nhận`,
+          message: `Client has cancelled Job #${jobId.slice(0, 6).toUpperCase()} that you accepted`,
           targetAddress: job.workerAddress,
         });
       }
@@ -303,7 +308,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addNotification({
         type: 'job_accepted',
         jobId,
-        message: `Worker đã chấp nhận Job #${jobId.slice(0, 6).toUpperCase()}`,
+        message: `Worker has accepted Job #${jobId.slice(0, 6).toUpperCase()}`,
         targetAddress: job.clientAddress,
       });
 
@@ -338,7 +343,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         addNotification({
           type: 'work_submitted',
           jobId,
-          message: `Worker đã nộp sản phẩm cho Job #${jobId.slice(0, 6).toUpperCase()}`,
+          message: `Worker has submitted work for Job #${jobId.slice(0, 6).toUpperCase()}`,
           targetAddress: job.clientAddress,
         });
 
@@ -421,7 +426,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addNotification({
         type: 'selected_as_voter',
         jobId,
-        message: `Bạn được chọn làm voter cho Job #${jobId.slice(0, 6).toUpperCase()}`,
+        message: `You have been selected as a voter for Job #${jobId.slice(0, 6).toUpperCase()}`,
         targetAddress: vAddress,
       });
     });
@@ -490,12 +495,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     addNotification({
       type: 'job_approved',
       jobId,
-      message: `Client đã duyệt và thanh toán cho Job #${jobId.slice(0, 6).toUpperCase()}`,
+      message: `Client has approved and paid for Job #${jobId.slice(0, 6).toUpperCase()}`,
       targetAddress: job.workerAddress!,
     });
   },
     [jobs, updateJobStatus, addNotification]
   );
+
 
   const getJobById = useCallback((jobId: string): Job | undefined => {
     return jobs.find((j) => j.id === jobId);
@@ -577,6 +583,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     getAvailableJobs,
     getWorkerJobs,
     getDisputesForUser,
+    language,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -17,12 +17,12 @@ contract BadgeManager {
         CHANGED_TERMS,           // 6: thay đổi điều khoản giữa chừng
         LOST_DISPUTE_CLIENT,     // 7: thua dispute (phía client)
         SERIAL_CANCELLER,        // 8: hủy job nhiều lần sau khi có worker nhận
-        SCAM_LABEL,              // 10: đủ điều kiện bị gán nhãn scam
+        SCAM_LABEL,              // 9: đủ điều kiện bị gán nhãn scam
 
         // Nhãn tốt — hiển thị thành tích
-        TOP_WORKER,              // 11: hoàn thành nhiều job, rating cao
-        RELIABLE_CLIENT,         // 12: luôn approve đúng hạn, không dispute
-        TRUSTED_VOTER            // 13: vote đúng nhiều lần
+        TOP_WORKER,              // 10: hoàn thành nhiều job, rating cao
+        RELIABLE_CLIENT,         // 11: luôn approve đúng hạn, không dispute
+        TRUSTED_VOTER            // 12: vote đúng nhiều lần
     }
 
     // ── Struct lưu từng badge ──────────────────────────────────

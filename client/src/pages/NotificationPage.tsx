@@ -6,6 +6,7 @@
 
 import { useLocation } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
+import { translations } from '@/lib/translations';
 import { formatDateTime } from '@/lib/status';
 import {
   Bell, CheckCheck, AlertTriangle, Scale, Shield, Briefcase,
@@ -20,7 +21,9 @@ export default function NotificationPage() {
     notifications,
     markNotificationRead,
     markAllNotificationsRead,
+    language,
   } = useApp();
+  const t = translations[language];
 
   if (!currentUser) return null;
 
@@ -66,11 +69,11 @@ export default function NotificationPage() {
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case 'dispute_raised_against_you': return 'Dispute mới';
-      case 'selected_as_voter': return 'Được chọn làm Voter';
-      case 'dispute_resolved': return 'Dispute đã giải quyết';
-      case 'job_status_changed': return 'Cập nhật Job';
-      default: return 'Thông báo';
+      case 'dispute_raised_against_you': return t.notif_type_dispute;
+      case 'selected_as_voter': return t.notif_type_voter;
+      case 'dispute_resolved': return t.notif_type_resolved;
+      case 'job_status_changed': return t.notif_type_job;
+      default: return t.notif_type_general;
     }
   };
 
@@ -105,10 +108,10 @@ export default function NotificationPage() {
             <div className="flex items-center gap-3">
               <Bell className="w-7 h-7 text-violet-400" />
               <div>
-                <h1 className="text-2xl font-bold text-white">Thông báo</h1>
+                <h1 className="text-2xl font-bold text-white">{t.notif_title}</h1>
                 {unreadCount > 0 && (
                   <p className="text-sm text-violet-300">
-                    {unreadCount} chưa đọc
+                    {unreadCount} {t.notif_unread}
                   </p>
                 )}
               </div>
@@ -121,7 +124,7 @@ export default function NotificationPage() {
                 className="text-white/60 hover:text-white hover:bg-white/10 flex items-center gap-1.5"
               >
                 <CheckCheck className="w-4 h-4" />
-                <span className="text-xs">Đánh dấu tất cả đã đọc</span>
+                <span className="text-xs">{t.notif_mark_all_read}</span>
               </Button>
             )}
           </div>
@@ -132,9 +135,9 @@ export default function NotificationPage() {
         {userNotifs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-28 text-center">
             <Bell className="w-16 h-16 text-white/15 mb-4" />
-            <h2 className="text-xl font-semibold text-white/40 mb-2">Không có thông báo</h2>
+            <h2 className="text-xl font-semibold text-white/40 mb-2">{t.notif_no_notifs}</h2>
             <p className="text-white/25 text-sm max-w-xs">
-              Khi có cập nhật về job, dispute, hoặc bạn được chọn làm voter, thông báo sẽ xuất hiện tại đây.
+              {t.notif_empty_desc}
             </p>
           </div>
         ) : (

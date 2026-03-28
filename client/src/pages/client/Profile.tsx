@@ -7,7 +7,8 @@
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
-import { User, LogOut, Copy, Check } from 'lucide-react';
+import { User, LogOut, Copy, Check, Star, Languages } from 'lucide-react';
+import { translations } from '@/lib/translations';
 import { useEffect, useState } from 'react';
 import { getContract } from '@/lib/blockchain';
 
@@ -26,7 +27,8 @@ type BadgeItem = {
 
 export default function ClientProfile() {
   const [, setLocation] = useLocation();
-  const { currentUser, logout, getJobsByClient } = useApp();
+  const { currentUser, logout, getJobsByClient, language } = useApp();
+  const t = translations[language];
   const [copied, setCopied] = useState(false);
   const [reputation, setReputation] = useState<number | null>(null);
   const [scoreHistory, setScoreHistory] = useState<ScoreHistoryItem[]>([]);
@@ -104,7 +106,7 @@ export default function ClientProfile() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="container py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t.profile_title}</h1>
         </div>
       </div>
 
@@ -139,8 +141,8 @@ export default function ClientProfile() {
           </div>
 
           {/* Address */}
-          <div>
-            <p className="text-sm text-gray-600 mb-2">Wallet Address</p>
+          <div className="mb-6 pb-6 border-b border-gray-200">
+            <p className="text-sm text-gray-600 mb-2">{t.profile_address}</p>
             <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-3">
               <code className="text-sm font-mono text-gray-900 flex-1 break-all">
                 {currentUser.address}
@@ -157,6 +159,7 @@ export default function ClientProfile() {
               </button>
             </div>
           </div>
+
         </div>
 
         {/* Badges */}
@@ -209,7 +212,7 @@ export default function ClientProfile() {
           className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg gap-2"
         >
           <LogOut className="w-4 h-4" />
-          Logout
+          {t.logout}
         </Button>
       </div>
     </div>

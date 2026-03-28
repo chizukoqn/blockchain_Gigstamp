@@ -11,10 +11,12 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { formatCurrency, formatDateTime } from '@/lib/status';
 import { Plus, ArrowRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { translations } from '@/lib/translations';
 
 export default function ClientDashboard() {
   const [, setLocation] = useLocation();
-  const { currentUser, getJobsByClient } = useApp();
+  const { currentUser, getJobsByClient, language } = useApp();
+  const t = translations[language];
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'createdAt' | 'startTime'>('createdAt');
 
@@ -45,9 +47,9 @@ export default function ClientDashboard() {
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">My Jobs</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{t.dashboard_client_title}</h1>
               <p className="text-sm text-gray-600 mt-1">
-                Manage your posted jobs and track progress
+                {t.dashboard_client_subtitle}
               </p>
             </div>
             <Button
@@ -55,7 +57,7 @@ export default function ClientDashboard() {
               className="gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Create Job</span>
+              <span className="hidden sm:inline">{t.dashboard_create_cta}</span>
             </Button>
           </div>
         </div>
@@ -110,7 +112,7 @@ export default function ClientDashboard() {
               onClick={() => setLocation('/client/create-job')}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
             >
-              Create Job
+              {t.dashboard_create_cta}
             </Button>
           </div>
         ) : (

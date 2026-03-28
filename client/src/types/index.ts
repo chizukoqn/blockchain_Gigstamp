@@ -4,6 +4,7 @@
  */
 
 export type UserRole = 'client' | 'worker';
+export type Language = 'en' | 'vi';
 
 // Support both existing lowercase UI statuses and on-chain style uppercase statuses.
 export type JobStatus =
@@ -34,6 +35,8 @@ export type NotificationType =
   | 'dispute_raised'
   | 'dispute_raised_against_you'
   | 'selected_as_voter'
+  | 'voter_voted'
+  | 'voters_deadline_missed'
   | 'dispute_resolved';
 
 export interface Notification {
@@ -56,6 +59,7 @@ export interface User {
 export interface Job {
   id: string;
   onchainJobId?: string;
+  title: string;
   clientId: string;
   clientAddress: string;
   workerId?: string;
@@ -111,4 +115,6 @@ export interface AppState {
   jobs: Job[];
   feedbacks: Feedback[];
   workerStats: Record<string, WorkerStats>;
+  notifications: Notification[];
+  language: Language;
 }

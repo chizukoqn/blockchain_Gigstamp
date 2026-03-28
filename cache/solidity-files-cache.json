@@ -118,8 +118,8 @@
       ]
     },
     "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\GigStamp.sol": {
-      "lastModificationDate": 1774629151965,
-      "contentHash": "8d1084b40e71f72184b30f444f9827bd",
+      "lastModificationDate": 1774686721014,
+      "contentHash": "2098c30c6280a960e2fab41f0da592bc",
       "sourceName": "contracts/GigStamp.sol",
       "solcConfig": {
         "version": "0.8.20",
@@ -235,8 +235,8 @@
       ]
     },
     "D:\\2025_2026\\se2\\blockchain\\gigstamp\\gigstamp\\contracts\\BadgeManager.sol": {
-      "lastModificationDate": 1774580782028,
-      "contentHash": "74668e4f1a72fb8a378b80dc051437fe",
+      "lastModificationDate": 1774687411161,
+      "contentHash": "4f6d4458aca361cdaf231bd3fccf6610",
       "sourceName": "contracts/BadgeManager.sol",
       "solcConfig": {
         "version": "0.8.20",

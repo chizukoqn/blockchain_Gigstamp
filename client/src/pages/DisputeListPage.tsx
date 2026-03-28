@@ -1,7 +1,7 @@
 /**
  * Dispute List Page
- * Hiển thị danh sách các dispute liên quan đến user hiện tại
- * (là client, worker, hoặc voter trong dispute đó)
+ * Displays a list of disputes related to the current user
+ * (as client, worker, or voter in that dispute)
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -9,16 +9,21 @@ import { useLocation } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
 import { getContract } from '@/lib/blockchain';
 import { formatDateTime } from '@/lib/status';
-import { Scale, ArrowRight, Clock, CheckCircle, AlertTriangle, User } from 'lucide-react';
+import { Scale, ArrowRight, Clock, CheckCircle, AlertTriangle, User, Filter, SortDesc } from 'lucide-react';
+import { translations } from '@/lib/translations';
 
 export default function DisputeListPage() {
   const [, setLocation] = useLocation();
-  const { currentUser, getDisputesForUser, setDisputeVoters, addNotification } = useApp();
+  const { currentUser, getDisputesForUser, setDisputeVoters, addNotification, language } = useApp();
+  const t = translations[language];
   const contractRef = useRef<any>(null);
   const [votersFetched, setVotersFetched] = useState(false);
 
   const address = currentUser?.address ?? '';
-  const disputes = getDisputesForUser(address);
+  const rawDisputes = getDisputesForUser(address);
+  const disputes = [...rawDisputes].sort((a, b) => 
+    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
 
   const getContractOnce = async () => {
     if (contractRef.current) return contractRef.current;
@@ -28,7 +33,7 @@ export default function DisputeListPage() {
     return c;
   };
 
-  // Fetch voters on-chain cho tất cả disputed jobs mà user là client/worker
+  // Fetch voters on-chain for all disputed jobs where the user is a client/worker
   useEffect(() => {
     if (!currentUser || votersFetched) return;
 
@@ -37,12 +42,12 @@ export default function DisputeListPage() {
         const contract = await getContractOnce();
         if (!contract) return;
 
-        // Tất cả jobs đang disputed/resolved mà user có liên quan
+        // All jobs currently disputed/resolved that the user is involved in
         const allDisputedJobs = getDisputesForUser(address);
 
         for (const job of allDisputedJobs) {
           if (!job.onchainJobId) continue;
-          if (job.disputeVoters && job.disputeVoters.length > 0) continue; // đã có
+          if (job.disputeVoters && job.disputeVoters.length > 0) continue; // already fetched
 
           try {
             const voters: string[] = await contract.getDisputeVoters(BigInt(job.onchainJobId));
@@ -52,7 +57,7 @@ export default function DisputeListPage() {
             if (clean.length > 0) {
               setDisputeVoters(job.id, clean);
 
-              // Tạo notification nếu user là voter
+              // Create notification if user is a voter
               const isVoter = clean.some(
                 (v: string) => v.toLowerCase() === currentUser.address.toLowerCase()
               );
@@ -60,13 +65,13 @@ export default function DisputeListPage() {
                 addNotification({
                   type: 'selected_as_voter',
                   jobId: job.id,
-                  message: `Bạn được chọn làm voter cho dispute của Job #${job.id.slice(0, 6).toUpperCase()}`,
+                  message: `You were selected as a voter for the dispute of Job #${job.id.slice(0, 6).toUpperCase()}`,
                   targetAddress: currentUser.address,
                 });
               }
             }
           } catch {
-            // bỏ qua lỗi per-job
+            // skip per-job errors
           }
         }
       } catch (err) {
@@ -92,7 +97,7 @@ export default function DisputeListPage() {
     if (isInitiator) return { label: 'Initiator', color: 'orange' };
     if (isClient) return { label: 'Client', color: 'blue' };
     if (isWorker) return { label: 'Worker', color: 'emerald' };
-    return { label: 'Tham gia', color: 'gray' };
+    return { label: 'Participant', color: 'gray' };
   };
 
   return (
@@ -103,9 +108,9 @@ export default function DisputeListPage() {
           <div className="flex items-center gap-3">
             <Scale className="w-7 h-7 text-violet-400" />
             <div>
-              <h1 className="text-2xl font-bold text-white">Disputes của tôi</h1>
+              <h1 className="text-2xl font-bold text-white">{t.dispute_list_title}</h1>
               <p className="text-sm text-white/50">
-                {disputes.length} dispute liên quan đến bạn
+                {disputes.length} {t.dispute_list_subtitle}
               </p>
             </div>
           </div>
@@ -116,9 +121,9 @@ export default function DisputeListPage() {
         {disputes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Scale className="w-16 h-16 text-white/20 mb-4" />
-            <h2 className="text-xl font-semibold text-white/50 mb-2">Không có dispute nào</h2>
+            <h2 className="text-xl font-semibold text-white/50 mb-2">{t.dispute_no_disputes}</h2>
             <p className="text-white/30 text-sm">
-              Bạn chưa tham gia vào bất kỳ dispute nào.
+              You haven't been involved in any disputes yet.
             </p>
           </div>
         ) : (
@@ -186,16 +191,16 @@ export default function DisputeListPage() {
                           }}
                         >
                           {isResolved ? (
-                            <><CheckCircle className="w-3 h-3" /> Resolved</>
+                            <><CheckCircle className="w-3 h-3" /> {t.dispute_resolved}</>
                           ) : (
-                            <><AlertTriangle className="w-3 h-3" /> Active</>
+                            <><AlertTriangle className="w-3 h-3" /> {t.dispute_active}</>
                           )}
                         </span>
 
                         {/* Resolved result */}
                         {isResolved && job.disputeWorkerWon !== undefined && (
                           <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 text-white/60">
-                            🏆 {job.disputeWorkerWon ? 'Worker thắng' : 'Client thắng'}
+                           🏆 {job.disputeWorkerWon ? t.dispute_worker_won : t.dispute_client_won}
                           </span>
                         )}
                       </div>
@@ -203,7 +208,7 @@ export default function DisputeListPage() {
                       {/* Time info */}
                       <div className="flex items-center gap-1 mt-3 text-white/30 text-xs">
                         <Clock className="w-3 h-3" />
-                        <span>Cập nhật: {formatDateTime(job.updatedAt)}</span>
+                        <span>{t.updated}: {formatDateTime(job.updatedAt)}</span>
                       </div>
                     </div>
 

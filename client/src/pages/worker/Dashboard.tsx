@@ -9,13 +9,15 @@ import { useLocation } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
 import { formatRating } from '@/lib/status';
 import { Briefcase, Star, TrendingUp } from 'lucide-react';
+import { translations } from '@/lib/translations';
 import { useMemo, useRef, useState } from 'react';
 import { getContract } from '@/lib/blockchain';
 import { toast } from 'sonner';
 
 export default function WorkerDashboard() {
   const [, setLocation] = useLocation();
-  const { currentUser, getWorkerStats, getWorkerJobs, jobs: allJobs } = useApp();
+  const { currentUser, getWorkerStats, getWorkerJobs, jobs: allJobs, language } = useApp();
+  const t = translations[language];
   const [txLoading, setTxLoading] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const contractRef = useRef<any>(null);
@@ -88,9 +90,9 @@ export default function WorkerDashboard() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="container py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Worker Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t.dashboard_worker_title}</h1>
           <p className="text-sm text-gray-600 mt-1">
-            Track your progress and find new opportunities
+            {t.dashboard_subtitle}
           </p>
         </div>
       </div>
@@ -102,7 +104,7 @@ export default function WorkerDashboard() {
           {/* Average Rating */}
           <div className="bg-white rounded-2xl p-6 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-600">Average Rating</h3>
+              <h3 className="text-sm font-semibold text-gray-600">{t.dashboard_avg_rating}</h3>
               <Star className="w-5 h-5 text-yellow-400" />
             </div>
             {stats.ratingCount > 0 ? (
@@ -111,120 +113,59 @@ export default function WorkerDashboard() {
                   {formatRating(stats.averageRating)}
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  Based on {stats.ratingCount} review{stats.ratingCount !== 1 ? 's' : ''}
+                  {t.dashboard_based_on} {stats.ratingCount} {t.dashboard_reviews}
                 </p>
               </>
             ) : (
-              <p className="text-lg text-gray-600">No rating yet</p>
+              <p className="text-lg text-gray-600">{t.dashboard_no_rating}</p>
             )}
           </div>
 
           {/* Jobs Completed */}
           <div className="bg-white rounded-2xl p-6 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-600">Jobs Completed</h3>
+              <h3 className="text-sm font-semibold text-gray-600">{t.profile_jobs_completed}</h3>
               <Briefcase className="w-5 h-5 text-blue-600" />
             </div>
             <p className="text-3xl font-bold text-gray-900">{completedJobs}</p>
             <p className="text-xs text-gray-500 mt-1">
-              {jobs.length} total jobs applied
+              {jobs.length} {t.dashboard_total_applied}
             </p>
           </div>
 
           {/* Active Jobs */}
           <div className="bg-white rounded-2xl p-6 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-600">Active Jobs</h3>
+              <h3 className="text-sm font-semibold text-gray-600">{t.dashboard_active_jobs}</h3>
               <TrendingUp className="w-5 h-5 text-green-600" />
             </div>
             <p className="text-3xl font-bold text-gray-900">
               {jobs.filter((j) => j.status !== 'completed').length}
             </p>
             <p className="text-xs text-gray-500 mt-1">
-              In progress or pending
+              {t.dashboard_in_progress}
             </p>
           </div>
         </div>
 
-        {/* Dispute Voting Invitations */}
-        {disputedJobs.length > 0 && (
-          <div className="bg-red-50 rounded-2xl p-6 border border-red-200 mb-6">
-            <div className="flex items-start justify-between gap-3 mb-4">
-              <div>
-                <h2 className="text-lg font-semibold text-red-900">
-                  You’re invited to vote
-                </h2>
-                <p className="text-sm text-red-800 mt-1">
-                  Active disputes need community votes. Voting may grant rewards (if enabled by the contract).
-                </p>
-              </div>
-              {txLoading && (
-                <span className="text-sm font-semibold text-red-900">{txLoading}</span>
-              )}
-            </div>
 
-            <div className="space-y-3">
-              {disputedJobs.slice(0, 3).map((job: any) => (
-                <div
-                  key={job.id}
-                  className="bg-white/60 rounded-xl border border-red-100 p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-gray-900">
-                        Job #{job.id.slice(0, 6).toUpperCase()}
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Tap the job for details, or vote here.
-                      </p>
-                    </div>
-                    <Button
-                      onClick={() => setLocation(`/worker/job/${job.id}`)}
-                      variant="outline"
-                      className="h-9 rounded-lg"
-                    >
-                      View
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-                    <Button
-                      onClick={() => handleVote(job.id, true)}
-                      disabled={!!txLoading}
-                      className="h-11 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-50"
-                    >
-                      Vote for Worker
-                    </Button>
-                    <Button
-                      onClick={() => handleVote(job.id, false)}
-                      disabled={!!txLoading}
-                      className="h-11 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg disabled:opacity-50"
-                    >
-                      Vote for Client
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* CTA Button */}
         <Button
           onClick={() => setLocation('/worker/browse-jobs')}
           className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg mb-6"
         >
-          Browse Available Jobs
+          {t.dashboard_browse_cta}
         </Button>
 
         {/* Recent Jobs */}
         {jobs.length > 0 && (
           <div className="bg-white rounded-2xl p-6 border border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
-              Your Recent Jobs
+              {t.dashboard_recent_jobs}
             </h2>
             <div className="mb-4">
-              <label className="text-sm text-gray-600 mr-2">Filter by status badge</label>
+              <label className="text-sm text-gray-600 mr-2">{t.dashboard_filter_status}</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}

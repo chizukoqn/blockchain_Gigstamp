@@ -8,17 +8,23 @@ import { Button } from '@/components/ui/button';
 import { useLocation, useRoute } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
 import { StatusBadge } from '@/components/StatusBadge';
+import { Label } from '@/components/ui/label';
 import { formatCurrency, formatDateTime } from '@/lib/status';
-import { ArrowLeft, MapPin, Clock, DollarSign } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, DollarSign, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { getContract } from '@/lib/blockchain';
 import { buildEvidencePayload, hashEvidencePayload } from '@/lib/evidence';
+import { WorkerProfile } from '@/components/WorkerProfile';
+import { ClientProfileCard } from '@/components/ClientProfileCard';
+import { X, Upload } from 'lucide-react';
+import { translations } from '@/lib/translations';
 
 export default function WorkerJobDetail() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute('/worker/job/:jobId');
-  const { currentUser, getJobById, applyForJob, getWorkerJobs, submitWork, updateJobStatus, setDisputeEvidence, setDisputeInitiator, setDisputeVoters, addNotification } = useApp();
+  const { currentUser, getJobById, applyForJob, getWorkerJobs, submitWork, updateJobStatus, setDisputeEvidence, setDisputeInitiator, setDisputeVoters, addNotification, language } = useApp();
+  const t = translations[language];
   
   const [showSubmit, setShowSubmit] = useState(false);
   const [resultDescription, setResultDescription] = useState('');
@@ -86,12 +92,12 @@ export default function WorkerJobDetail() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Job not found</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t.job_not_found}</h1>
           <Button
             onClick={() => setLocation('/worker/browse-jobs')}
             className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
           >
-            Back to Browse
+            {t.back}
           </Button>
         </div>
       </div>
@@ -308,6 +314,10 @@ export default function WorkerJobDetail() {
     }
   };
 
+  const handleRemoveDisputeImage = (idx: number) => {
+    setDisputeEvidenceImages(prev => prev.filter((_, i) => i !== idx));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
       {/* Header */}
@@ -323,10 +333,15 @@ export default function WorkerJobDetail() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Job #{job.id.slice(0, 6).toUpperCase()}
+              <h1 className="text-2xl font-black text-gray-900 leading-tight">
+                {job.title}
               </h1>
-              <StatusBadge status={job.status} className="mt-2" />
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                  ID {job.id.slice(0, 6).toUpperCase()}
+                </span>
+                <StatusBadge status={job.status} />
+              </div>
             </div>
           </div>
         </div>
@@ -336,14 +351,14 @@ export default function WorkerJobDetail() {
       <div className="container py-6 max-w-2xl">
         {/* Detail Cards */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Job Details</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">{t.job_details_title}</h2>
           <div className="flex items-start gap-3">
             <DollarSign className="w-5 h-5 text-blue-600 mt-1" />
-            <div><p className="text-sm text-gray-600">Pay</p><p className="font-semibold">{formatCurrency(job.pay)}</p></div>
+            <div><p className="text-sm text-gray-600">{t.job_pay}</p><p className="font-semibold">{formatCurrency(job.pay)}</p></div>
           </div>
           <div className="flex items-start gap-3">
             <Clock className="w-5 h-5 text-blue-600 mt-1" />
-            <div><p className="text-sm text-gray-600">Start</p><p className="font-semibold">{formatDateTime(job.startTime)}</p></div>
+            <div><p className="text-sm text-gray-600">{t.job_start_date}</p><p className="font-semibold">{formatDateTime(job.startTime)}</p></div>
           </div>
           <div className="flex items-start gap-3">
             <Clock className="w-5 h-5 text-blue-600 mt-1" />
@@ -351,7 +366,7 @@ export default function WorkerJobDetail() {
           </div>
           <div className="flex items-start gap-3">
             <MapPin className="w-5 h-5 text-blue-600 mt-1" />
-            <div><p className="text-sm text-gray-600">Location</p><p className="font-semibold">{job.location}</p></div>
+            <div><p className="text-sm text-gray-600">{t.job_location}</p><p className="font-semibold">{job.location || t.unknown}</p></div>
           </div>
         </div>
 
@@ -361,8 +376,8 @@ export default function WorkerJobDetail() {
         </div>
 
         <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Client</h2>
-          <p className="text-gray-700 font-mono text-sm break-all">{job.clientAddress}</p>
+          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3 px-2">Assigned Client</h2>
+          <ClientProfileCard clientAddress={job.clientAddress} />
         </div>
 
         {/* Actions Section */}
@@ -370,73 +385,159 @@ export default function WorkerJobDetail() {
           {/* Apply / Start / Submit logic */}
           {job.status === 'funded' && !isApplied && (
             <Button onClick={handleApply} disabled={!!txLoading} className="w-full h-12 bg-blue-600 text-white font-bold rounded-xl">
-              Apply for Job
+              {t.job_apply_for}
             </Button>
           )}
 
           {isApplied && normalizedStatus === 'ACCEPTED' && !showSubmit && (
             <div className="space-y-3">
               <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
-                <p className="text-sm text-amber-900">Start deadline: <b>{startDeadlineSec ? formatRemaining(startDeadlineSec) : 'N/A'}</b></p>
-                {startDeadlineSec && nowSec > startDeadlineSec && (
-                  <Button onClick={handleTriggerCancelIfNotStarted} size="sm" variant="outline" className="w-full mt-2">Trigger Timeout</Button>
+                <p className="text-sm text-amber-900 font-medium">
+                  {t.job_deadline_start}: <span className="font-bold">{startDeadlineSec ? formatRemaining(startDeadlineSec) : 'N/A'}</span>
+                </p>
+                {startDeadlineSec && nowSec > startDeadlineSec ? (
+                  <div className="mt-2 text-xs text-rose-600 font-bold uppercase tracking-wider bg-rose-50 p-2 rounded-lg border border-rose-100 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Deadline missed. Client may cancel.
+                  </div>
+                ) : (
+                  <Button onClick={handleStartJob} disabled={!!txLoading} className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl mt-3 shadow-lg shadow-green-600/20">
+                    {txLoading ? 'Starting...' : t.job_start_work}
+                  </Button>
                 )}
               </div>
-              <Button onClick={handleStartJob} disabled={!!txLoading} className="w-full h-12 bg-green-600 text-white font-bold rounded-xl">
-                {txLoading || 'Start Work'}
-              </Button>
             </div>
           )}
 
           {isApplied && normalizedStatus === 'IN_PROGRESS' && !showSubmit && (
              <div className="space-y-3">
               <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
-                <p className="text-sm text-blue-900">Submit deadline: <b>{submitDeadlineSec ? formatRemaining(submitDeadlineSec) : 'N/A'}</b></p>
+                <p className="text-sm text-blue-900 font-medium">
+                  {t.job_deadline_submit}: <span className="font-bold">{submitDeadlineSec ? formatRemaining(submitDeadlineSec) : 'N/A'}</span>
+                </p>
+                {submitDeadlineSec && nowSec > submitDeadlineSec ? (
+                  <div className="mt-2 text-xs text-rose-600 font-bold uppercase tracking-wider bg-rose-50 p-2 rounded-lg border border-rose-100 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Deadline missed. Payment at risk.
+                  </div>
+                ) : (
+                  <Button onClick={() => setShowSubmit(true)} className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl mt-3 shadow-lg shadow-green-600/20">
+                    {t.job_submit_work}
+                  </Button>
+                )}
               </div>
-              <Button onClick={() => setShowSubmit(true)} className="w-full h-12 bg-green-600 text-white font-bold rounded-xl">
-                Submit Completed Work
-              </Button>
             </div>
           )}
 
           {showSubmit && (
-            <div className="bg-white rounded-2xl p-6 border border-gray-200 space-y-4">
-              <h3 className="font-bold">Submit Work</h3>
-              <textarea 
-                value={resultDescription} 
-                onChange={e => setResultDescription(e.target.value)}
-                placeholder="Describe your work..."
-                rows={4}
-                className="w-full p-3 border rounded-xl"
-              />
-              <input type="file" multiple onChange={handleEvidenceImagesChange} className="text-sm" />
-              <div className="flex gap-3">
-                <Button onClick={() => setShowSubmit(false)} variant="outline" className="flex-1">Cancel</Button>
-                <Button onClick={handleSubmitWork} disabled={loading} className="flex-1 bg-green-600 text-white">Submit</Button>
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 space-y-5 shadow-sm">
+              <h3 className="text-xl font-bold text-gray-900">{t.job_submit_work}</h3>
+              
+              <div>
+                <Label className="text-sm font-semibold text-gray-700 mb-2 block">{t.job_describe_work}</Label>
+                <textarea 
+                  value={resultDescription} 
+                  onChange={e => setResultDescription(e.target.value)}
+                  placeholder="Tell the client about your work..."
+                  rows={4}
+                  className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-all resize-none shadow-inner"
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm font-semibold text-gray-700 mb-2 block">Evidence Files</Label>
+                <div className="flex flex-col gap-3">
+                  <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all group">
+                    <Upload className="w-5 h-5 text-gray-400 group-hover:text-green-600" />
+                    <span className="text-sm font-bold text-gray-500 group-hover:text-green-700">Choose Evidence Photo</span>
+                    <input type="file" multiple onChange={handleEvidenceImagesChange} className="hidden" />
+                  </label>
+
+                  {evidenceImages.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {evidenceImages.map((src, i) => (
+                        <div key={i} className="relative group">
+                          <img src={src} alt="preview" className="w-full h-28 object-cover rounded-xl border border-gray-100 shadow-sm" />
+                          <button 
+                            onClick={() => setEvidenceImages(prev => prev.filter((_, idx) => idx !== i))}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-all"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <Button onClick={() => setShowSubmit(false)} variant="outline" className="flex-1 h-12 rounded-xl border-gray-200">{t.cancel}</Button>
+                <Button onClick={handleSubmitWork} disabled={loading} className="flex-1 h-12 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-green-600/20">
+                  {loading ? 'Submitting...' : 'Submit Work'}
+                </Button>
               </div>
             </div>
           )}
 
           {job.status === 'submitted' && isApplied && (
             <div className="bg-blue-50 p-6 rounded-2xl border border-blue-200 text-center font-bold text-blue-800">
-              Work submitted! Waiting for approval.
+              {t.job_work_submitted}
             </div>
           )}
 
           {/* New Dispute Flow */}
           {(normalizedStatus === 'IN_PROGRESS' || normalizedStatus === 'SUBMITTED') && (
             <div className="bg-orange-50 p-6 rounded-2xl border border-orange-200 space-y-4">
-              <h3 className="font-bold text-orange-900">Raise a Dispute</h3>
+              <h3 className="font-bold text-orange-900 border-b border-orange-200 pb-2 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                {t.job_raise_dispute}
+              </h3>
+              <p className="text-sm text-orange-800/80">
+                {t.job_provide_evidence_desc}
+              </p>
+              
               <textarea 
                 value={disputeEvidenceText}
                 onChange={e => setDisputeEvidenceText(e.target.value)}
                 placeholder="Why are you raising a dispute?"
-                className="w-full p-3 border border-orange-200 rounded-xl"
+                className="w-full p-3 border border-orange-200 rounded-xl focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all outline-none"
+                rows={4}
               />
-              <input type="file" multiple onChange={handleDisputeEvidenceImagesChange} />
-              <Button onClick={handleRaiseDispute} disabled={!!txLoading} className="w-full bg-orange-600 text-white">Raise Dispute</Button>
+
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="sr-only">Choose evidence photo</span>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-orange-300 border-dashed rounded-xl cursor-pointer hover:border-orange-500 hover:bg-orange-50 transition-all">
+                    <Upload className="w-5 h-5 text-orange-600" />
+                    <span className="text-sm font-bold text-orange-700">Choose Evidence Photo</span>
+                    <input type="file" multiple onChange={handleDisputeEvidenceImagesChange} className="hidden" />
+                  </div>
+                </label>
+
+                {disputeEvidenceImages.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    {disputeEvidenceImages.map((src, i) => (
+                      <div key={i} className="relative group">
+                        <img src={src} alt="dispute-preview" className="w-full h-28 object-cover rounded-xl border border-orange-200" />
+                        <button 
+                          onClick={() => handleRemoveDisputeImage(i)}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg hover:bg-red-600 transition-all"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Button onClick={handleRaiseDispute} disabled={!!txLoading} className="w-full h-12 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded-xl shadow-lg shadow-orange-600/20">
+                {txLoading || t.job_raise_dispute}
+              </Button>
             </div>
           )}
+
 
           {/* Dispute Active/Resolved Banner */}
           {(normalizedStatus === 'DISPUTED' || normalizedStatus === 'RESOLVED') && (
@@ -444,10 +545,10 @@ export default function WorkerJobDetail() {
               normalizedStatus === 'RESOLVED' ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'
             }`}>
               <div>
-                <h3 className="font-bold">{normalizedStatus === 'RESOLVED' ? 'Dispute Resolved' : 'Dispute Active'}</h3>
-                <p className="text-sm">{normalizedStatus === 'RESOLVED' ? 'This case is closed.' : 'This case is formal.'}</p>
+                <h3 className="font-bold">{normalizedStatus === 'RESOLVED' ? t.job_dispute_resolved : t.job_dispute_active}</h3>
+                <p className="text-sm">{normalizedStatus === 'RESOLVED' ? t.job_case_closed : t.job_dispute_formal}</p>
               </div>
-              <Button onClick={() => setLocation(`/dispute/${job.id}`)} variant="outline">View Details</Button>
+              <Button onClick={() => setLocation(`/dispute/${job.id}`)} variant="outline">{t.job_view_details_btn}</Button>
             </div>
           )}
         </div>

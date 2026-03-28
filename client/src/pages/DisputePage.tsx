@@ -1,9 +1,9 @@
 /**
  * Dispute Page – Role-based dispute detail view
- * Hiển thị thông tin dispute và UI khác nhau cho:
- *  - Initiator (người khởi tạo)
- *  - Responder (bên bị dispute)
- *  - Voter (người được chọn vote)
+ * Displays dispute information and different UI for:
+ *  - Initiator
+ *  - Responder
+ *  - Voter
  */
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
@@ -17,8 +17,11 @@ import { formatDateTime } from '@/lib/status';
 import {
   ArrowLeft, Scale, User, Briefcase, Clock, FileText,
   CheckCircle, XCircle, AlertTriangle, ThumbsUp, ThumbsDown,
-  Shield, Eye, Upload
+  Shield, Eye, Upload, LucideIcon
 } from 'lucide-react';
+import { WorkerProfile } from '@/components/WorkerProfile';
+import { ClientProfileCard } from '@/components/ClientProfileCard';
+import { translations } from '@/lib/translations';
 
 export default function DisputePage() {
   const [, setLocation] = useLocation();
@@ -26,8 +29,9 @@ export default function DisputePage() {
   const {
     currentUser, getJobById, updateJobStatus,
     setCounterEvidence, setDisputeVoters, setDisputeResolved,
-    addNotification, notifications,
+    addNotification, notifications, language,
   } = useApp();
+  const t = translations[language];
 
   const [txLoading, setTxLoading] = useState<string | null>(null);
   const [counterText, setCounterText] = useState('');
@@ -36,6 +40,7 @@ export default function DisputePage() {
   const [onchainDispute, setOnchainDispute] = useState<any>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [myVoteChoice, setMyVoteChoice] = useState<boolean | null>(null);
+  const [voterStatuses, setVoterStatuses] = useState<Record<string, boolean>>({});
   const contractRef = useRef<any>(null);
 
   const job = getJobById(params?.jobId ?? '');
@@ -50,6 +55,9 @@ export default function DisputePage() {
 
   // Xác định role của user trong dispute này
   const userAddress = currentUser?.address?.toLowerCase() ?? '';
+  const isDisputed = job?.status === 'disputed' || job?.status === 'DISPUTED' || job?.status === 'resolved' || job?.status === 'RESOLVED';
+  const isResolved = job?.status === 'resolved' || job?.status === 'RESOLVED' || job?.disputeResolved;
+  
   const isInitiator = useMemo(
     () => job?.disputeInitiator?.toLowerCase() === userAddress,
     [job, userAddress]
@@ -106,6 +114,16 @@ export default function DisputePage() {
             setMyVoteChoice(choice);
           }
         }
+
+        // Fetch vote status for all voters
+        if (cleanVoters.length > 0) {
+          const statuses: Record<string, boolean> = {};
+          await Promise.all(cleanVoters.map(async (vAddr: string) => {
+            const v: boolean = await contract.hasVoted(onchainJobId, vAddr);
+            statuses[vAddr.toLowerCase()] = v;
+          }));
+          setVoterStatuses(statuses);
+        }
       } catch (err) {
         console.error('Failed to fetch on-chain dispute data:', err);
       }
@@ -114,16 +132,53 @@ export default function DisputePage() {
     fetchOnchain();
   }, [job?.onchainJobId, currentUser?.address]);
 
+  // Deadline check and notification
+  useEffect(() => {
+    if (!onchainDispute || !job || isResolved) return;
+    
+    const deadline = Number(onchainDispute.deadline);
+    const now = Math.floor(Date.now() / 1000);
+    const votedCount = Object.values(voterStatuses).filter(v => v).length;
+    
+    if (now > deadline && votedCount < 3) {
+      // Send notification if not already sent (using jobId + type as unique key in addNotification prevents duplicates)
+      const jobShortId = job.id.slice(0, 6).toUpperCase();
+      const missing = 3 - votedCount;
+      const msg = `${t.notif_deadline_missed} ${jobShortId}. ${missing} ${t.voters_missing || 'voters missed'}.`;
+      
+      [job.clientAddress, job.workerAddress].filter(Boolean).forEach(addr => {
+        addNotification({
+          type: 'voters_deadline_missed',
+          jobId: job.id,
+          message: msg,
+          targetAddress: addr!
+        });
+      });
+    }
+  }, [onchainDispute, voterStatuses, job, isResolved, addNotification, language]);
+
   const handleReplaceVoters = async () => {
     if (!job?.onchainJobId) return;
-    setTxLoading('Đang thay thế voter...');
+    setTxLoading('Replacing voters...');
     try {
       const contract = await getContractOnce();
       if (!contract) return;
       const tx = await contract.replaceInactiveVoters(BigInt(job.onchainJobId));
       await tx.wait();
-      toast.success('Đã thay thế các voter không hoạt động và reset deadline!');
-      // Reload page state
+
+      // Notify parties
+      const jobShortId = job.id.slice(0, 6).toUpperCase();
+      const notifMsg = `${t.notif_voter_replaced || 'Voters replaced for Job #'} ${jobShortId}.`;
+      [job.clientAddress, job.workerAddress].filter(Boolean).forEach(addr => {
+        addNotification({
+          type: 'selected_as_voter',
+          jobId: job.id,
+          message: notifMsg,
+          targetAddress: addr!
+        });
+      });
+
+      toast.success(t.dispute_replace_success || 'Inactive voters replaced and deadline reset!');
       window.location.reload();
     } catch (err: any) {
       toast.error(err?.shortMessage || err?.message || 'Failed to replace voters');
@@ -160,7 +215,7 @@ export default function DisputePage() {
       return;
     }
     if (!job?.onchainJobId) { toast.error('Missing on-chain job ID'); return; }
-    setTxLoading('Đang xử lý giao dịch...');
+    setTxLoading('Processing transaction...');
     try {
       const contract = await getContractOnce();
       if (!contract) { toast.error('Contract unavailable'); return; }
@@ -181,7 +236,7 @@ export default function DisputePage() {
 
   const handleVote = async (voteForWorker: boolean) => {
     if (!job?.onchainJobId) { toast.error('Missing on-chain job ID'); return; }
-    setTxLoading('Đang ghi phiếu bầu...');
+    setTxLoading('Casting vote...');
     try {
       const contract = await getContractOnce();
       if (!contract) { toast.error('Contract unavailable'); return; }
@@ -190,7 +245,22 @@ export default function DisputePage() {
       
       setHasVoted(true);
       setMyVoteChoice(voteForWorker);
-      toast.success(`Đã vote cho ${voteForWorker ? 'Worker' : 'Client'}!`);
+      toast.success(`${t.dispute_vote_success || 'Voted for'} ${voteForWorker ? t.role_worker : t.role_client}!`);
+
+      // Notify Client and Worker with progress
+      const jobShortId = job.id.slice(0, 6).toUpperCase();
+      const votedCount = Object.values(voterStatuses).filter(v => v).length + 1; // plus current vote
+      const totalRequired = 3; 
+      const notifMsg = `${t.notif_voter_voted} ${jobShortId} (${votedCount}/${totalRequired}).`;
+      
+      [job.clientAddress, job.workerAddress].filter(Boolean).forEach((addr) => {
+        addNotification({
+          type: 'voter_voted',
+          jobId: job.id,
+          message: notifMsg,
+          targetAddress: addr!,
+        });
+      });
     } catch (err: any) {
       toast.error(err?.shortMessage || err?.message || 'Failed to vote');
     } finally {
@@ -200,7 +270,7 @@ export default function DisputePage() {
 
   const handleResolve = async () => {
     if (!job?.onchainJobId) { toast.error('Missing on-chain job ID'); return; }
-    setTxLoading('Đang giải quyết dispute...');
+    setTxLoading('Resolving dispute...');
     try {
       const contract = await getContractOnce();
       if (!contract) { toast.error('Contract unavailable'); return; }
@@ -228,7 +298,7 @@ export default function DisputePage() {
       // Tạo notification cho cả 3 bên
       const winner = workerWon ? 'Worker' : 'Client';
       const jobShortId = job.id.slice(0, 6).toUpperCase();
-      const notifMsg = `Dispute Job #${jobShortId} đã được giải quyết. Bên thắng: ${winner}`;
+      const notifMsg = `Dispute for Job #${jobShortId} has been resolved. Winner: ${winner}`;
       [
         job.clientAddress,
         job.workerAddress ?? '',
@@ -242,7 +312,7 @@ export default function DisputePage() {
         });
       });
 
-      toast.success(`Dispute đã được giải quyết! Bên thắng: ${winner}`);
+      toast.success(`${t.dispute_resolved}! ${t.dispute_winner}: ${winner}`);
     } catch (err: any) {
       toast.error(err?.shortMessage || err?.message || 'Failed to resolve dispute');
     } finally {
@@ -257,31 +327,26 @@ export default function DisputePage() {
       <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)' }}>
         <div className="text-center text-white">
           <AlertTriangle className="w-16 h-16 mx-auto mb-4 text-amber-400" />
-          <h1 className="text-2xl font-bold mb-4">Dispute không tìm thấy</h1>
+          <h1 className="text-2xl font-bold mb-4">{t.dispute_no_disputes}</h1>
           <Button onClick={() => setLocation('/disputes')} className="bg-violet-600 hover:bg-violet-700">
-            Quay lại Disputes
+            {t.back} {t.nav_disputes}
           </Button>
         </div>
       </div>
     );
   }
 
-  const isDisputed =
-    job.status === 'disputed' || job.status === 'DISPUTED' ||
-    job.status === 'resolved' || job.status === 'RESOLVED';
-  const isResolved = job.status === 'resolved' || job.status === 'RESOLVED' || job.disputeResolved;
-
   const initiatorIsClient = job.disputeInitiator?.toLowerCase() === job.clientAddress?.toLowerCase();
   const initiatorLabel = initiatorIsClient ? 'Client (Initiator)' : 'Worker (Initiator)';
   const responderLabel = initiatorIsClient ? 'Worker (Responder)' : 'Client (Responder)';
 
   const yourRoleLabel = isInitiator
-    ? '🟢 Bạn là người khởi tạo dispute'
+    ? '🟢 You are the dispute initiator'
     : isResponder
-    ? '🔴 Bạn là bên bị dispute'
+    ? '🔴 You are the responder'
     : isVoter
-    ? '🟡 Bạn là Voter được chọn'
-    : '👁️ Người xem';
+    ? '🟡 You are a selected Voter'
+    : '👁️ Observer';
 
   const hasCounterEvidence = job.counterEvidenceText || (job.counterEvidenceImages?.length ?? 0) > 0;
 
@@ -300,7 +365,7 @@ export default function DisputePage() {
             <div className="flex items-center gap-2">
               <Scale className="w-5 h-5 text-violet-400" />
               <h1 className="text-xl font-bold text-white">
-                Dispute #{job.id.slice(0, 6).toUpperCase()}
+                {t.role_dispute} #{job.id.slice(0, 6).toUpperCase()}
               </h1>
             </div>
             <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold mt-1 ${
@@ -308,7 +373,7 @@ export default function DisputePage() {
                 ? 'bg-green-500/20 text-green-300'
                 : 'bg-red-500/20 text-red-300'
             }`}>
-              {isResolved ? '✅ Resolved' : '⚖️ Active'}
+              {isResolved ? `✅ ${t.dispute_resolved}` : `⚖️ ${t.dispute_active}`}
             </span>
           </div>
           {/* Your Role Badge */}
@@ -332,9 +397,9 @@ export default function DisputePage() {
         }`}>
           <p className="font-semibold">{yourRoleLabel}</p>
           <p className="text-sm opacity-80 mt-0.5">
-            {isInitiator && 'Bạn đã khởi tạo dispute này. Xem evidence và resolve khi đủ điều kiện.'}
-            {isResponder && 'Bạn bị dispute. Hãy nộp counter evidence để bảo vệ quan điểm của bạn.'}
-            {isVoter && 'Bạn được chọn làm voter. Hãy xem xét bằng chứng và bỏ phiếu.'}
+            {isInitiator && 'You initiated this dispute. Review evidence and resolve when conditions are met.'}
+            {isResponder && 'You are being disputed. Please provide counter evidence to defend your position.'}
+            {isVoter && 'You were selected as a voter. Please review the evidence and cast your vote.'}
           </p>
         </div>
 
@@ -342,18 +407,18 @@ export default function DisputePage() {
         <div className="rounded-2xl p-6 border border-white/10" style={{ background: 'rgba(255,255,255,0.05)' }}>
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <Briefcase className="w-5 h-5 text-violet-400" />
-            Thông tin Job
+            Job Info
           </h2>
           <div className="space-y-3">
             <InfoRow label="Job ID (local)" value={`#${job.id.slice(0, 8).toUpperCase()}`} />
             {job.onchainJobId && (
               <InfoRow label="On-chain Job ID" value={`#${job.onchainJobId}`} />
             )}
-            <InfoRow label="Mô tả" value={job.description} />
-            <InfoRow label="Ngày tạo job" value={formatDateTime(job.createdAt)} />
-            <InfoRow label="Ngày bắt đầu" value={formatDateTime(job.startTime)} />
-            <InfoRow label="Ngày kết thúc" value={formatDateTime(job.endTime)} />
-            {job.location && <InfoRow label="Địa điểm" value={job.location} />}
+            <InfoRow label="Description" value={job.description} />
+            <InfoRow label="Created At" value={formatDateTime(job.createdAt)} />
+            <InfoRow label="Start Time" value={formatDateTime(job.startTime)} />
+            <InfoRow label="End Time" value={formatDateTime(job.endTime)} />
+            {job.location && <InfoRow label="Location" value={job.location} />}
           </div>
         </div>
 
@@ -361,58 +426,78 @@ export default function DisputePage() {
         <div className="rounded-2xl p-6 border border-white/10" style={{ background: 'rgba(255,255,255,0.05)' }}>
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <User className="w-5 h-5 text-cyan-400" />
-            Các bên tham gia
+            Participants
           </h2>
           <div className="space-y-3">
             <ParticipantRow
-              label="Client"
+              label={t.role_client}
               address={job.clientAddress}
-              badge={initiatorIsClient ? '⚡ Initiator' : undefined}
+              badge={initiatorIsClient ? `⚡ ${t.role_initiator}` : undefined}
               isCurrentUser={job.clientAddress?.toLowerCase() === userAddress}
             />
             <ParticipantRow
-              label="Worker"
+              label={t.role_worker}
               address={job.workerAddress ?? '—'}
-              badge={!initiatorIsClient ? '⚡ Initiator' : undefined}
+              badge={!initiatorIsClient ? `⚡ ${t.role_initiator}` : undefined}
               isCurrentUser={job.workerAddress?.toLowerCase() === userAddress}
             />
-            {job.disputeInitiator && (
-              <ParticipantRow
-                label="Người khởi tạo dispute"
-                address={job.disputeInitiator}
-                badge="⚡ Initiator"
-                highlight
-              />
-            )}
-            {(job.disputeVoters ?? []).length > 0 && (
-              <div>
-                <p className="text-sm text-white/50 mb-2">Voters được chọn:</p>
-                {(job.disputeVoters ?? []).map((v, i) => (
-                  <ParticipantRow
-                    key={i}
-                    label={`Voter ${i + 1}`}
-                    address={v}
-                    badge="🗳️ Voter"
-                    isCurrentUser={v.toLowerCase() === userAddress}
-                  />
-                ))}
+            {job.disputeVoters && job.disputeVoters.length > 0 && (
+              <div className="pt-2 border-t border-white/5 mt-4">
+                <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-3">Dispute Voters</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {job.disputeVoters.map((v, i) => {
+                    const voted = voterStatuses[v.toLowerCase()];
+                    return (
+                      <ParticipantRow
+                        key={i}
+                        label={`${t.role_voter} ${i + 1}`}
+                        address={v}
+                        badge={voted ? `✅ Voted` : '⏳ Pending'}
+                        isCurrentUser={v.toLowerCase() === userAddress}
+                      />
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
         </div>
 
+        {/* Profiles for Context */}
+        {job.clientAddress && job.workerAddress && (
+          <div className="space-y-4">
+             <h3 className="text-sm font-bold text-white/40 uppercase tracking-widest px-2">Dispute Participants Profiles</h3>
+             
+             {/* Client Profile */}
+             <div className="space-y-2">
+               <p className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest px-2 flex items-center gap-1">
+                 <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" /> Client context
+               </p>
+               <ClientProfileCard clientAddress={job.clientAddress} />
+             </div>
+
+             {/* Worker Profile */}
+             <div className="space-y-2">
+               <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest px-2 flex items-center gap-1">
+                 <div className="w-1.5 h-1.5 rounded-full bg-violet-400" /> Worker context
+               </p>
+               <WorkerProfile workerAddress={job.workerAddress} />
+             </div>
+          </div>
+        )}
+
         {/* Evidence Section */}
         <div className="rounded-2xl p-6 border border-white/10" style={{ background: 'rgba(255,255,255,0.05)' }}>
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5 text-orange-400" />
-            Bằng chứng
+            {t.dispute_evidence}
           </h2>
 
           {/* Initiator Evidence */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]" />
-              <p className="text-sm font-semibold text-white/80">{initiatorLabel} – Evidence gốc</p>
+              <p className="text-sm font-semibold text-white/80">{initiatorLabel} – Original Evidence</p>
             </div>
             {job.disputeEvidenceText ? (
               <div className="rounded-xl p-4 border border-orange-400/20 bg-orange-400/5">
@@ -420,7 +505,7 @@ export default function DisputePage() {
               </div>
             ) : (
               <div className="rounded-xl p-4 border border-white/10 bg-white/5">
-                <p className="text-white/40 text-sm italic">Evidence chỉ lưu on-chain (hash)</p>
+                <p className="text-white/40 text-sm italic">Evidence stored on-chain (hash)</p>
                 {job.disputeEvidenceHash && (
                   <p className="text-white/30 text-xs font-mono mt-1 break-all">{job.disputeEvidenceHash}</p>
                 )}
@@ -444,7 +529,7 @@ export default function DisputePage() {
           <div>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]" />
-              <p className="text-sm font-semibold text-white/80">{responderLabel} – Counter Evidence</p>
+              <p className="text-sm font-semibold text-white/80">{responderLabel} – {t.dispute_counter_evidence}</p>
             </div>
             {hasCounterEvidence ? (
               <>
@@ -469,7 +554,7 @@ export default function DisputePage() {
             ) : (
               <div className="rounded-xl p-4 border border-dashed border-white/20 bg-white/5 text-center">
                 <Clock className="w-6 h-6 text-white/30 mx-auto mb-2" />
-                <p className="text-white/40 text-sm">Chưa có counter evidence</p>
+                <p className="text-white/40 text-sm">No counter evidence yet</p>
               </div>
             )}
           </div>
@@ -480,15 +565,15 @@ export default function DisputePage() {
           <div className="rounded-2xl p-6 border border-cyan-500/30" style={{ background: 'rgba(6,182,212,0.07)' }}>
             <h3 className="text-lg font-bold text-cyan-300 mb-2 flex items-center gap-2">
               <Upload className="w-5 h-5" />
-              Nộp Counter Evidence
+              {t.dispute_submit_counter}
             </h3>
             <p className="text-sm text-cyan-200/70 mb-4">
-              Cung cấp bằng chứng phản hồi để bảo vệ quan điểm của bạn.
+              Provide counter evidence to defend your position.
             </p>
             <textarea
               value={counterText}
               onChange={(e) => setCounterText(e.target.value)}
-              placeholder="Mô tả phản hồi của bạn..."
+              placeholder="Describe your counter evidence..."
               rows={4}
               className="w-full px-4 py-3 rounded-xl border border-white/20 bg-white/10 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-cyan-400 resize-none mb-3"
             />
@@ -519,7 +604,7 @@ export default function DisputePage() {
               className="w-full h-12 font-semibold rounded-xl disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg, #06b6d4, #0891b2)', color: 'white' }}
             >
-              {txLoading ?? 'Nộp Counter Evidence'}
+              {txLoading ?? 'Submit Counter Evidence'}
             </Button>
           </div>
         )}
@@ -529,7 +614,7 @@ export default function DisputePage() {
           <div className="rounded-2xl p-6 border border-amber-500/30" style={{ background: 'rgba(245,158,11,0.07)' }}>
             <h3 className="text-lg font-bold text-amber-300 mb-2 flex items-center gap-2">
               <Shield className="w-5 h-5" />
-              Bỏ phiếu
+              {t.dispute_vote}
             </h3>
             
             {hasVoted ? (
@@ -537,9 +622,11 @@ export default function DisputePage() {
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-6 h-6 text-amber-400" />
                   <div>
-                    <p className="text-white font-semibold">Bạn đã hoàn thành vote</p>
+                    <p className="text-white font-semibold">Voting Complete</p>
                     <p className="text-amber-200/70 text-sm">
-                      Bạn đã bầu cho: <span className="font-bold text-amber-300">{myVoteChoice ? 'Worker (Bên nộp Counter Evidence)' : 'Client (Bên khởi tạo)'}</span>
+                      {t.dispute_voter_progress || 'Voter progress'}: {Object.values(voterStatuses).filter(v => v).length} / {job.disputeVoters?.length || 3}
+                      <br />
+                      {t.dispute_voted_for || 'You voted for'}: <span className="font-bold text-amber-300">{myVoteChoice ? t.role_worker : t.role_client}</span>
                     </p>
                   </div>
                 </div>
@@ -547,7 +634,7 @@ export default function DisputePage() {
             ) : (
               <>
                 <p className="text-sm text-amber-200/70 mb-5">
-                  Hãy xem xét kỹ bằng chứng từ cả hai bên trước khi bỏ phiếu. Mỗi voter chỉ vote được 1 lần.
+                  Please review evidence from both sides carefully before voting. Each voter triggers only one vote.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <Button
@@ -557,7 +644,7 @@ export default function DisputePage() {
                     style={{ background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', color: 'white' }}
                   >
                     <ThumbsUp className="w-5 h-5" />
-                    <span className="text-sm">Vote for Client</span>
+                    <span className="text-sm">{t.dispute_vote_for_client}</span>
                   </Button>
                   <Button
                     onClick={() => handleVote(true)}
@@ -566,7 +653,7 @@ export default function DisputePage() {
                     style={{ background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white' }}
                   >
                     <ThumbsDown className="w-5 h-5" />
-                    <span className="text-sm">Vote for Worker</span>
+                    <span className="text-sm">{t.dispute_vote_for_worker}</span>
                   </Button>
                 </div>
               </>
@@ -582,9 +669,9 @@ export default function DisputePage() {
           <div className="space-y-4">
             {/* Resolve Section */}
             <div className="rounded-2xl p-6 border border-violet-500/30" style={{ background: 'rgba(139,92,246,0.07)' }}>
-              <h3 className="text-lg font-bold text-violet-300 mb-2">⚖️ Resolve Dispute</h3>
+              <h3 className="text-lg font-bold text-violet-300 mb-2">⚖️ {t.dispute_resolve}</h3>
               <p className="text-sm text-violet-200/70 mb-5">
-                Chỉ có thể resolve khi: tất cả voter đã bỏ phiếu <strong>HOẶC</strong> đã hết thời gian voting.
+                Can only resolve when: all voters have cast votes <strong>OR</strong> voting deadline has passed.
               </p>
               <Button
                 onClick={handleResolve}
@@ -592,7 +679,7 @@ export default function DisputePage() {
                 className="w-full h-12 font-bold rounded-xl disabled:opacity-50"
                 style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', color: 'white' }}
               >
-                {txLoading ?? '⚖️ Resolve Dispute'}
+                {txLoading ?? `⚖️ ${t.dispute_resolve}`}
               </Button>
             </div>
 
@@ -601,10 +688,10 @@ export default function DisputePage() {
               <div className="rounded-2xl p-6 border border-rose-500/30" style={{ background: 'rgba(244,63,94,0.07)' }}>
                 <h3 className="text-lg font-bold text-rose-300 mb-2 items-center flex gap-2">
                   <AlertTriangle className="w-5 h-5" />
-                  Quá hạn deadline voting
+                  {t.dispute_deadline_reached}
                 </h3>
                 <p className="text-sm text-rose-200/70 mb-5">
-                  Một số voter đã không thực hiện bỏ phiếu đúng hạn. Bạn có thể thay thế họ bằng các voter mới và reset deadline.
+                  {t.dispute_replace_suggestion}
                 </p>
                 <Button
                   onClick={handleReplaceVoters}
@@ -612,7 +699,7 @@ export default function DisputePage() {
                   className="w-full h-12 font-bold rounded-xl"
                   style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)', color: 'white' }}
                 >
-                  {txLoading ?? '🔄 Thay thế Voter & Tiếp tục'}
+                  {txLoading ?? `🔄 ${t.dispute_replace_voters}`}
                 </Button>
               </div>
             )}
@@ -633,9 +720,9 @@ export default function DisputePage() {
                 <CheckCircle className="w-8 h-8 text-blue-400" />
               )}
               <div>
-                <h3 className="text-lg font-bold text-white">Dispute Đã Được Giải Quyết</h3>
+                <h3 className="text-lg font-bold text-white">{t.dispute_resolved}</h3>
                 <p className={`font-semibold ${job.disputeWorkerWon ? 'text-emerald-300' : 'text-blue-300'}`}>
-                  🏆 Bên thắng: {job.disputeWorkerWon ? 'Worker' : 'Client'}
+                  🏆 {t.dispute_winner}: {job.disputeWorkerWon ? t.role_worker : t.role_client}
                 </p>
               </div>
             </div>
@@ -643,8 +730,8 @@ export default function DisputePage() {
               <div className="rounded-xl p-3 bg-white/10">
                 <p className="text-sm text-white/70">
                   {job.disputeWorkerWon
-                    ? '✅ Worker thắng — Tiền được chuyển cho Worker'
-                    : '✅ Client thắng — Tiền được hoàn lại cho Client'}
+                    ? `✅ ${t.dispute_worker_won}`
+                    : `✅ ${t.dispute_client_won}`}
                 </p>
               </div>
             )}
@@ -695,7 +782,7 @@ function ParticipantRow({
             <span className="text-xs bg-white/10 text-white/60 px-2 py-0.5 rounded-full">{badge}</span>
           )}
           {isCurrentUser && (
-            <span className="text-xs bg-violet-500/30 text-violet-300 px-2 py-0.5 rounded-full">Bạn</span>
+            <span className="text-xs bg-violet-500/30 text-violet-300 px-2 py-0.5 rounded-full">You</span>
           )}
         </div>
       </div>

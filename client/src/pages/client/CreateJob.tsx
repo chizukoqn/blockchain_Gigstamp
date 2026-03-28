@@ -21,6 +21,7 @@ export default function CreateJob() {
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
+    title: '',
     pay: '',
     startTime: '',
     endTime: '',
@@ -40,6 +41,7 @@ export default function CreateJob() {
 
     try {
       if (
+        !formData.title ||
         !formData.pay ||
         !formData.startTime ||
         !formData.endTime ||
@@ -93,6 +95,7 @@ export default function CreateJob() {
       await tx.wait();
 
       createJob(
+        formData.title,
         pay,
         formData.startTime,
         formData.endTime,
@@ -139,10 +142,28 @@ export default function CreateJob() {
       <div className="container py-6 max-w-2xl">
         <div className="bg-white rounded-2xl p-6 border border-gray-200">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Job Title */}
+            <div>
+              <Label htmlFor="title" className="text-sm font-semibold text-gray-700">
+                Job Title
+              </Label>
+              <Input
+                id="title"
+                name="title"
+                type="text"
+                placeholder="e.g., UI Designer for Mobile App"
+                value={formData.title}
+                onChange={handleChange}
+                className="mt-2 h-11 rounded-lg border-gray-300"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                A short, descriptive title for your job
+              </p>
+            </div>
             {/* Pay */}
             <div>
               <Label htmlFor="pay" className="text-sm font-semibold text-gray-700">
-                Pay Amount ($)
+                Pay Amount (ETH)
               </Label>
               <Input
                 id="pay"

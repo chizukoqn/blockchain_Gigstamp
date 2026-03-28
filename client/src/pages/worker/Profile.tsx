@@ -7,7 +7,8 @@
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'wouter';
 import { useApp } from '@/contexts/AppContext';
-import { User, LogOut, Copy, Check, Star } from 'lucide-react';
+import { User, LogOut, Copy, Check, Star, Languages } from 'lucide-react';
+import { translations } from '@/lib/translations';
 import { useEffect, useState } from 'react';
 import { formatRating } from '@/lib/status';
 import { getContract } from '@/lib/blockchain';
@@ -27,7 +28,8 @@ type BadgeItem = {
 
 export default function WorkerProfile() {
   const [, setLocation] = useLocation();
-  const { currentUser, logout, getWorkerStats, getWorkerJobs } = useApp();
+  const { currentUser, logout, getWorkerStats, getWorkerJobs, language } = useApp();
+  const t = translations[language];
   const [copied, setCopied] = useState(false);
   const [reputation, setReputation] = useState<number | null>(null);
   const [scoreHistory, setScoreHistory] = useState<ScoreHistoryItem[]>([]);
@@ -106,7 +108,7 @@ export default function WorkerProfile() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="container py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Profile</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t.profile_title}</h1>
         </div>
       </div>
 
@@ -127,15 +129,15 @@ export default function WorkerProfile() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Jobs Completed</p>
+              <p className="text-sm text-gray-600 mb-1">{t.profile_jobs_completed}</p>
               <p className="text-2xl font-bold text-gray-900">{completedJobs}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600 mb-1">Total Jobs Applied</p>
+              <p className="text-sm text-gray-600 mb-1">{t.profile_total_jobs}</p>
               <p className="text-2xl font-bold text-gray-900">{jobs.length}</p>
             </div>
             <div>
-              <p className="text-sm text-gray-600 mb-1">Reputation Score</p>
+              <p className="text-sm text-gray-600 mb-1">{t.profile_reputation}</p>
               <p className="text-2xl font-bold text-gray-900">{reputation ?? '—'}</p>
             </div>
           </div>
@@ -144,7 +146,7 @@ export default function WorkerProfile() {
           <div className="mb-6 pb-6 border-b border-gray-200">
             <div className="flex items-center gap-2 mb-2">
               <Star className="w-5 h-5 text-yellow-400" />
-              <p className="text-sm text-gray-600">Average Rating</p>
+              <p className="text-sm text-gray-600">{t.profile_rating}</p>
             </div>
             {stats.ratingCount > 0 ? (
               <>
@@ -161,8 +163,8 @@ export default function WorkerProfile() {
           </div>
 
           {/* Address */}
-          <div>
-            <p className="text-sm text-gray-600 mb-2">Wallet Address</p>
+          <div className="mb-6 pb-6 border-b border-gray-200">
+            <p className="text-sm text-gray-600 mb-2">{t.profile_address}</p>
             <div className="flex items-center gap-2 bg-gray-50 rounded-lg p-3">
               <code className="text-sm font-mono text-gray-900 flex-1 break-all">
                 {currentUser.address}
@@ -179,11 +181,12 @@ export default function WorkerProfile() {
               </button>
             </div>
           </div>
+
         </div>
 
         {/* Badges */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">Badges</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">{t.profile_badges}</h3>
           {badges.length === 0 ? (
             <p className="text-sm text-gray-600">No badges yet.</p>
           ) : (
@@ -202,7 +205,7 @@ export default function WorkerProfile() {
 
         {/* Reputation History */}
         <div className="bg-white rounded-2xl p-6 border border-gray-200 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-3">Reputation History</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">{t.profile_history}</h3>
           {scoreHistory.length === 0 ? (
             <p className="text-sm text-gray-600">No score changes yet.</p>
           ) : (
@@ -231,7 +234,7 @@ export default function WorkerProfile() {
           className="w-full h-12 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg gap-2"
         >
           <LogOut className="w-4 h-4" />
-          Logout
+          {t.logout}
         </Button>
       </div>
     </div>

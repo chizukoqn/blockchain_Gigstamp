@@ -11,15 +11,23 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { formatCurrency, formatDateTime } from '@/lib/status';
 import { MapPin, DollarSign, Clock, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { translations } from '@/lib/translations';
 import { getContract } from '@/lib/blockchain';
 
 export default function BrowseJobs() {
   const [, setLocation] = useLocation();
-  const { currentUser, getAvailableJobs, applyForJob, getWorkerJobs } = useApp();
+  const { currentUser, getAvailableJobs, applyForJob, getWorkerJobs, language } = useApp();
+  const t = translations[language];
   const [appliedJobs, setAppliedJobs] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'createdAt' | 'startTime'>('createdAt');
+  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   if (!currentUser) {
     return null;
@@ -32,6 +40,14 @@ export default function BrowseJobs() {
       ? [...availableJobs] 
       : availableJobs.filter((job) => String(job.status).toUpperCase() === statusFilter);
     
+    // Filter out expired jobs (only for those that can be accepted)
+    result = result.filter((job) => {
+      if (job.status !== 'funded') return true; // Only filter funded jobs that are yet to be accepted
+      if (!job.startTime) return true;
+      const startTimeSec = Math.floor(new Date(job.startTime).getTime() / 1000);
+      return nowSec < startTimeSec + (job.tolerance || 0);
+    });
+
     // Sort logic
     result.sort((a, b) => {
       const dateA = new Date(a[sortBy]).getTime();
@@ -40,7 +56,7 @@ export default function BrowseJobs() {
     });
 
     return result;
-  }, [availableJobs, statusFilter, sortBy]);
+  }, [availableJobs, statusFilter, sortBy, nowSec]);
   const workerJobs = getWorkerJobs(currentUser.id);
   const appliedJobIds = workerJobs.map((j) => j.id);
 
@@ -80,9 +96,9 @@ export default function BrowseJobs() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="container py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Browse Jobs</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{t.nav_browse}</h1>
           <p className="text-sm text-gray-600 mt-1">
-            {availableJobs.length} jobs available
+            {availableJobs.length} {t.job_available_count}
           </p>
         </div>
       </div>
@@ -123,7 +139,7 @@ export default function BrowseJobs() {
               <DollarSign className="w-8 h-8 text-gray-400" />
             </div>
             <h2 className="text-lg font-semibold text-gray-900 mb-2">
-              No jobs available
+              {t.job_no_available}
             </h2>
             <p className="text-gray-600 mb-6">
               Check back later for new opportunities.
@@ -132,7 +148,7 @@ export default function BrowseJobs() {
               onClick={() => setLocation('/worker/dashboard')}
               className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
             >
-              Back to Dashboard
+              {t.back}
             </Button>
           </div>
         ) : (
@@ -146,16 +162,26 @@ export default function BrowseJobs() {
                   className="bg-white rounded-2xl p-4 border border-gray-200 hover:shadow-md transition-shadow"
                 >
                   <div className="flex items-start justify-between gap-4 mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-gray-900">
-                          Job #{job.id.slice(0, 6).toUpperCase()}
+                    <div className="flex items-start justify-between w-full">
+                      <div className="flex-1 min-w-0 pr-4">
+                        <h3 className="text-xl font-bold text-gray-900 truncate transition-colors">
+                          {job.title}
                         </h3>
-                        <StatusBadge status={job.status} />
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                            ID {job.id.slice(0, 6).toUpperCase()}
+                          </span>
+                          <StatusBadge status={job.status} />
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-600 line-clamp-2">
-                        {job.description}
-                      </p>
+                      <div className="flex flex-col items-end flex-shrink-0">
+                        <div className="text-xl font-black text-blue-600 leading-tight">
+                          {formatCurrency(job.pay)}
+                        </div>
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
+                          Reward
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -164,7 +190,7 @@ export default function BrowseJobs() {
                     <div className="flex items-center gap-2">
                       <DollarSign className="w-4 h-4 text-blue-600" />
                       <div>
-                        <p className="text-xs text-gray-500">Pay</p>
+                        <p className="text-xs text-gray-500">{t.job_pay}</p>
                         <p className="font-semibold text-gray-900">
                           {formatCurrency(job.pay)}
                         </p>
@@ -173,7 +199,7 @@ export default function BrowseJobs() {
                     <div className="flex items-center gap-2">
                       <Clock className="w-4 h-4 text-blue-600" />
                       <div>
-                        <p className="text-xs text-gray-500">Start Date</p>
+                        <p className="text-xs text-gray-500">{t.job_start_date}</p>
                         <p className="font-semibold text-gray-900 text-sm">
                           {formatDateTime(job.startTime)}
                         </p>
@@ -182,9 +208,9 @@ export default function BrowseJobs() {
                     <div className="flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-blue-600" />
                       <div>
-                        <p className="text-xs text-gray-500">Location</p>
+                        <p className="text-xs text-gray-500">{t.job_location}</p>
                         <p className="font-semibold text-gray-900 text-sm">
-                          {job.distance || '2.3 km'}
+                          {job.location || t.unknown}
                         </p>
                       </div>
                     </div>
@@ -197,7 +223,7 @@ export default function BrowseJobs() {
                       variant="outline"
                       className="flex-1 h-10 rounded-lg gap-2"
                     >
-                      View Details
+                      {t.job_view_details}
                       <ArrowRight className="w-4 h-4" />
                     </Button>
                     <Button
@@ -205,7 +231,7 @@ export default function BrowseJobs() {
                       disabled={isApplied}
                       className="flex-1 h-10 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {isApplied ? 'Applied' : 'Apply'}
+                      {isApplied ? t.job_applied : t.job_apply}
                     </Button>
                   </div>
                 </div>

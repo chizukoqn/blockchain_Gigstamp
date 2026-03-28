@@ -188,6 +188,12 @@ contract GigStamp is Auth, DisputeManager, BadgeManager {
         Job storage job = jobs[jobId];
         require(msg.sender == job.client, "Not client");
 
+        // ── Trường hợp 0: CREATED, chưa nạp tiền
+        if (job.status == JobStatus.CREATED) {
+            job.status = JobStatus.CANCELLED;
+            return;
+        }
+
         // ── Trường hợp 1: FUNDED, chưa ai nhận
         if (job.status == JobStatus.FUNDED) {
             job.status = JobStatus.CANCELLED;

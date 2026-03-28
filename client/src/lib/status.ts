@@ -43,7 +43,7 @@ export function getStatusLabel(status: JobStatus): string {
 export function getStatusColor(status: JobStatus): string {
   switch (normalizeStatus(status)) {
     case 'CREATED':
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-indigo-100 text-indigo-800';
     case 'FUNDED':
       return 'bg-blue-100 text-blue-800';
     case 'IN_PROGRESS':
@@ -83,7 +83,7 @@ export function getStatusIndex(status: JobStatus): number {
 }
 
 export function formatCurrency(amount: number): string {
-  return `$${amount.toFixed(2)}`;
+  return `${amount.toFixed(2)} ETH`;
 }
 
 export function formatDate(dateString: string): string {
