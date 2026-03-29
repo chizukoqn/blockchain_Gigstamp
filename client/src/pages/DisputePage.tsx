@@ -414,11 +414,9 @@ export default function DisputePage() {
             Job Info
           </h2>
           <div className="space-y-3">
-            <InfoRow label="Job Title" value={<span className="font-black text-violet-300">{job.title}</span>} />
-            <div className="pt-2 border-t border-white/5" />
-            <InfoRow label="Local ID" value={`#${job.id.slice(0, 8).toUpperCase()}`} />
+            <InfoRow label="Job ID (local)" value={`#${job.id.slice(0, 8).toUpperCase()}`} />
             {job.onchainJobId && (
-              <InfoRow label="On-chain ID" value={`#${job.onchainJobId}`} />
+              <InfoRow label="On-chain Job ID" value={`#${job.onchainJobId}`} />
             )}
             <InfoRow label="Description" value={job.description} />
             <InfoRow label="Created At" value={formatDateTime(job.createdAt)} />
@@ -760,7 +758,7 @@ export default function DisputePage() {
 
 // ── Helper Components ──────────────────────────────────────────
 
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between items-start gap-4">
       <span className="text-sm text-white/50 flex-shrink-0">{label}</span>

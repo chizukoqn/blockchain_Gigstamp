@@ -125,16 +125,11 @@ export default function ClientDashboard() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex flex-col gap-0.5 mb-3">
-                      <h3 className="text-gray-900 font-bold text-lg truncate leading-tight">
-                        {job.title}
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="font-semibold text-gray-900 truncate">
+                        Job #{job.id.slice(0, 6).toUpperCase()}
                       </h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
-                          ID {job.id.slice(0, 6).toUpperCase()}
-                        </span>
-                        <StatusBadge status={job.status} />
-                      </div>
+                      <StatusBadge status={job.status} />
                     </div>
                     <p className="text-sm text-gray-600 line-clamp-2 mb-3">
                       {job.description}

@@ -154,18 +154,14 @@ export default function DisputeListPage() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex flex-col gap-0.5 mb-3">
-                        <h3 className="text-white font-black text-lg truncate leading-tight">
-                          {job.title}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <span className="text-white/40 text-xs font-medium">
-                            ID #{job.id.slice(0, 6).toUpperCase()}
-                          </span>
-                          {job.onchainJobId && (
-                            <span className="text-white/20 text-[10px]">(On-chain #{job.onchainJobId})</span>
-                          )}
-                        </div>
+                      {/* Job ID + Status */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-white font-bold">
+                          Job #{job.id.slice(0, 6).toUpperCase()}
+                        </span>
+                        {job.onchainJobId && (
+                          <span className="text-white/40 text-xs">(On-chain #{job.onchainJobId})</span>
+                        )}
                       </div>
 
                       {/* Description */}
